@@ -97,6 +97,7 @@ Proof.
       assert (HintX1L_ex : ex_RInt (fun x => / lapse f mu x) (X + 1) L).
       { apply ex_RInt_inv_lapse; assumption. }
       rewrite <- (RInt_Chasles _ (X + 1) (X + 2) L HintXX HintX2L).
+      unfold plus; simpl.
       assert (H0part : 0 <= RInt (fun x => / lapse f mu x) (X + 2) L).
       { apply RInt_ge_0.
         - exact HX2_le_L.
@@ -113,58 +114,15 @@ Proof.
       assert (HintX1L_ex : ex_RInt (fun x => / lapse f mu x) (X + 1) L).
       { apply ex_RInt_inv_lapse; assumption. }
       rewrite <- (RInt_Chasles _ 0 (X + 1) L Hint0X1 HintX1L_ex).
+      unfold plus; simpl.
       assert (H0first : 0 <= RInt (fun x => / lapse f mu x) 0 (X + 1)).
       { apply RInt_ge_0.
         - exact H0X1.
         - exact Hint0X1.
         - intros x _. apply Hpos. }
       lra.
-    + (* X+1 < 0: then 0 is inside [X+1, L], so integral [0, L] is part of [X+1, L] *)
-      assert (H0X1' : X + 1 < 0) by lra.
-      assert (H0L : 0 <= L).
-      { unfold L. apply Rle_trans with 1; [lra | apply Rmax_r]. }
-      assert (HintX10 : ex_RInt (fun x => / lapse f mu x) (X + 1) 0).
-      { apply ex_RInt_inv_lapse; assumption. }
-      assert (Hint0L : ex_RInt (fun x => / lapse f mu x) 0 L).
-      { apply ex_RInt_inv_lapse; assumption. }
-      assert (HintX1L_ex : ex_RInt (fun x => / lapse f mu x) (X + 1) L).
-      { apply ex_RInt_inv_lapse; assumption. }
-      rewrite <- (RInt_Chasles _ (X + 1) 0 L HintX10 Hint0L) in HintX1L.
-      assert (HX10bound : RInt (fun x => / lapse f mu x) (X + 1) 0 <=
-                           RInt (fun x => / lapse f mu x) (X + 1) 0) by lra.
-      (* integral [X+1, L] = integral [X+1, 0] + integral [0, L] *)
-      (* So integral [0, L] = integral [X+1, L] - integral [X+1, 0] *)
-      (* integral [X+1, 0] might be negative since X+1 < 0 (reversed bounds)
-         Actually RInt with a < b and integrand >= 0 gives RInt >= 0.
-         Here X+1 < 0, so RInt from X+1 to 0 >= 0. *)
-      assert (Hge0 : 0 <= RInt (fun x => / lapse f mu x) (X + 1) 0).
-      { apply RInt_ge_0.
-        - lra.
-        - exact HintX10.
-        - intros x _. apply Hpos. }
-      (* integral [0, L] = integral [X+1, L] - integral [X+1, 0] >= (B+1) - integral [X+1, 0] *)
-      (* Hmm, this doesn't directly help. But we know integral [X+1, L] >= B+1
-         and integral [0, L] = integral [X+1, L] - integral [X+1, 0].
-         Since integral [X+1, 0] >= 0, integral [0, L] <= integral [X+1, L].
-         That goes the wrong way! *)
-      (* Actually: integral [X+1, L] = integral [X+1, 0] + integral [0, L]
-         So integral [0, L] = integral [X+1, L] - integral [X+1, 0].
-         Since both parts are >= 0, integral [0, L] <= integral [X+1, L].
-         But we need integral [0, L] >= B+1, not <=. *)
-      (* The fix: use a different decomposition.
-         integral [0, L] >= integral [0, X+2] >= integral of (B+1) on [max(0,X+1), X+2]
-         Since X+1 < 0, max(0,X+1) = 0. So integral [0, X+2] covers [0, X+2].
-         And for x in [0, X+2] with x > X, we have 1/N(x) > B+1.
-         The region where x > X inside [0, X+2] is (X, X+2].
-         If X < 0, this includes all of [0, X+2] (since 0 > X).
-         So integral [0, X+2] >= (B+1) * (X+2 - 0) = (B+1)(X+2).
-         But X+2 might be small. We need X+2 >= 1. Since X+1 < 0, X < -1, so X+2 < 1.
-         This doesn't work either. *)
-      (* Better approach: since X+1 < 0, we have X < -1.
-         Then for ALL x > X (which includes x = 0), 1/N(x) > B+1.
-         In particular, 1/N(x) > B+1 for all x in [0, 1] (since 0 > X).
-         integral [0, 1] >= (B+1) * 1 = B+1 > B.
-         And integral [0, L] >= integral [0, 1] since L >= 1 and integrand >= 0. *)
+    + (* X+1 < 0: X < -1, so all x >= 0 satisfy x > X.
+         1/N(x) > B+1 for all x in [0, 1]. Integral [0, L] >= integral [0, 1] >= B+1. *)
       assert (Hint01 : ex_RInt (fun x => / lapse f mu x) 0 1).
       { apply ex_RInt_inv_lapse; assumption. }
       assert (Hint1L : ex_RInt (fun x => / lapse f mu x) 1 L).
@@ -172,6 +130,7 @@ Proof.
       assert (H1L : 1 <= L).
       { unfold L. apply Rmax_r. }
       rewrite <- (RInt_Chasles _ 0 1 L Hint01 Hint1L).
+      unfold plus; simpl.
       assert (Hge1L : 0 <= RInt (fun x => / lapse f mu x) 1 L).
       { apply RInt_ge_0; [exact H1L | exact Hint1L | intros x _; apply Hpos]. }
       assert (Hge01_raw : (B + 1) * (1 - 0) <= RInt (fun x => / lapse f mu x) 0 1).
