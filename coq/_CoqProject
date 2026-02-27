@@ -1,0 +1,9 @@
+-Q . MeteringMetric
+-arg -w
+-arg -notation-overridden
+
+Definitions.v
+ProperTime.v
+Auxiliary.v
+Horizon.v
+Confinement.v

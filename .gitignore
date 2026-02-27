@@ -1,0 +1,8 @@
+coq/*.vo
+coq/*.vok
+coq/*.vos
+coq/*.glob
+coq/*.aux
+coq/.*.aux
+coq/.*.cache
+coq/.nra.cache
