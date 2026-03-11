@@ -327,6 +327,28 @@ def write_csv_rows(path: Path, rows: list[dict], fieldnames: list[str]) -> None:
         writer.writerows(rows)
 
 
+def write_json_artifact(path: Path, data: dict, aliases: Iterable[Path] = ()) -> None:
+    text = json.dumps(data, indent=2)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    for alias in aliases:
+        if alias == path:
+            continue
+        alias.parent.mkdir(parents=True, exist_ok=True)
+        alias.write_text(text, encoding="utf-8")
+
+
+def find_existing_json_artifact(candidates: Iterable[Path]) -> Path | None:
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
+def analysis_result_filename(result_prefix: str) -> str:
+    return f"{result_prefix.replace('_', '-')}-analysis.json"
+
+
 def download_file(url: str, path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
@@ -556,6 +578,21 @@ def build_radius_map_arcsec(
     return np.sqrt((xx - center_xpix) ** 2 + (yy - center_ypix) ** 2) * pixel_scale_arcsec
 
 
+def gaussian_smooth_masked(image: np.ndarray, footprint: np.ndarray, sigma_px: float) -> np.ndarray:
+    finite_mask = footprint & np.isfinite(image)
+    if not np.any(finite_mask):
+        raise ValueError("Masked Gaussian smoothing requires at least one finite pixel.")
+    values = np.where(finite_mask, image, 0.0)
+    weights = np.where(finite_mask, 1.0, 0.0)
+    smooth_values = gaussian_filter(values, sigma=sigma_px)
+    smooth_weights = gaussian_filter(weights, sigma=sigma_px)
+    smooth = np.full(image.shape, np.nan, dtype=float)
+    valid = smooth_weights > 1e-6
+    smooth[valid] = smooth_values[valid] / smooth_weights[valid]
+    smooth[~footprint] = np.nan
+    return smooth
+
+
 def build_residual_map(
     kappa: np.ndarray,
     footprint: np.ndarray,
@@ -567,14 +604,15 @@ def build_residual_map(
     radial_bin_arcsec: float,
 ) -> tuple[np.ndarray, dict]:
     if residual_mode == "gaussian_highpass":
-        smooth = gaussian_filter(kappa, sigma=smooth_sigma_px)
+        smooth = gaussian_smooth_masked(kappa, footprint, sigma_px=smooth_sigma_px)
         residual = kappa - smooth
+        residual[~footprint] = np.nan
         return residual, {
             "residual_mode": residual_mode,
             "smooth_sigma_px": smooth_sigma_px,
         }
 
-    if residual_mode == "radial_median":
+    if residual_mode in {"radial_median", "radial_median_bandpass"}:
         radius_map_arcsec = build_radius_map_arcsec(
             shape=kappa.shape,
             center_xpix=center_xpix,
@@ -608,13 +646,26 @@ def build_residual_map(
             left=float(radial_medians[valid][0]),
             right=float(radial_medians[valid][-1]),
         )
-        residual = kappa - baseline
+        radial_residual = kappa - baseline
+        radial_residual[~footprint] = np.nan
+
+        if residual_mode == "radial_median":
+            return radial_residual, {
+                "residual_mode": residual_mode,
+                "radial_bin_arcsec": radial_bin_arcsec,
+                "radial_bin_count": int(bin_centers.size),
+                "populated_radial_bin_count": int(np.count_nonzero(valid)),
+            }
+
+        local_background = gaussian_smooth_masked(radial_residual, footprint, sigma_px=smooth_sigma_px)
+        residual = radial_residual - local_background
         residual[~footprint] = np.nan
         return residual, {
             "residual_mode": residual_mode,
             "radial_bin_arcsec": radial_bin_arcsec,
             "radial_bin_count": int(bin_centers.size),
             "populated_radial_bin_count": int(np.count_nonzero(valid)),
+            "smooth_sigma_px": smooth_sigma_px,
         }
 
     raise ValueError(f"Unsupported residual mode: {residual_mode}")
@@ -1437,7 +1488,11 @@ def analyze_hff_cluster_map(
             },
         },
     }
-    (out_dir / f"{result_prefix}.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    write_json_artifact(
+        out_dir / analysis_result_filename(result_prefix),
+        result,
+        aliases=[out_dir / f"{result_prefix}.json"],
+    )
     return result
 
 
@@ -1580,8 +1635,13 @@ def analyze_hff_cluster_model_ensemble(
     for model_family in HFF_MODEL_VERSIONS[cluster_key]:
         run_counter += 1
         result_prefix = f"{cluster_key}_{model_family}"
-        result_path = out_dir / f"{result_prefix}.json"
-        if result_path.exists():
+        result_path = find_existing_json_artifact(
+            [
+                out_dir / analysis_result_filename(result_prefix),
+                out_dir / f"{result_prefix}.json",
+            ]
+        )
+        if result_path is not None:
             model_summaries.append(summarize_cluster_result(json.loads(result_path.read_text(encoding="utf-8"))))
             continue
         kappa_url = frontier_model_kappa_url(cluster_key, model_family)
@@ -1678,7 +1738,11 @@ def analyze_hff_cluster_model_ensemble(
             "random_null_significant_fraction": float(np.mean(random_p < 0.05)),
         },
     }
-    (out_dir / "model_ensemble.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    write_json_artifact(
+        out_dir / "model-family-ensemble-summary.json",
+        result,
+        aliases=[out_dir / "model_ensemble.json"],
+    )
     return result
 
 
@@ -1782,7 +1846,11 @@ def analyze_combined_hff_firstpass(
             },
         },
     }
-    (out_dir / "combined_firstpass.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    write_json_artifact(
+        out_dir / "combined-cluster-summary.json",
+        result,
+        aliases=[out_dir / "combined_firstpass.json"],
+    )
     return result
 
 
@@ -1902,7 +1970,11 @@ def run_full_experiment(
             "random_null_significant_run_fraction": float(np.mean(random_p < 0.05)),
         },
     }
-    (out_dir / "full_experiment.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    write_json_artifact(
+        out_dir / "archival-experiment-summary.json",
+        result,
+        aliases=[out_dir / "full_experiment.json"],
+    )
     return result
 
 
@@ -2017,7 +2089,11 @@ def run_robustness_sweep(
         "n_runs": len(rows),
         "summary": summary,
     }
-    (out_dir / "robustness_sweep.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    write_json_artifact(
+        out_dir / "residual-sensitivity-summary.json",
+        result,
+        aliases=[out_dir / "robustness_sweep.json"],
+    )
     return result
 
 
@@ -2181,7 +2257,11 @@ def build_parser() -> argparse.ArgumentParser:
     abell370.add_argument("--ring-inner-arcsec", type=float, default=5.0)
     abell370.add_argument("--ring-outer-arcsec", type=float, default=9.0)
     abell370.add_argument("--smooth-sigma-px", type=float, default=18.0)
-    abell370.add_argument("--residual-mode", choices=["gaussian_highpass", "radial_median"], default="radial_median")
+    abell370.add_argument(
+        "--residual-mode",
+        choices=["gaussian_highpass", "radial_median", "radial_median_bandpass"],
+        default="radial_median",
+    )
     abell370.add_argument("--radial-bin-arcsec", type=float, default=8.0)
     abell370.add_argument("--cluster-z-min", type=float, default=0.35)
     abell370.add_argument("--cluster-z-max", type=float, default=0.45)
@@ -2199,7 +2279,11 @@ def build_parser() -> argparse.ArgumentParser:
     rxcj2248.add_argument("--ring-inner-arcsec", type=float, default=5.0)
     rxcj2248.add_argument("--ring-outer-arcsec", type=float, default=9.0)
     rxcj2248.add_argument("--smooth-sigma-px", type=float, default=18.0)
-    rxcj2248.add_argument("--residual-mode", choices=["gaussian_highpass", "radial_median"], default="radial_median")
+    rxcj2248.add_argument(
+        "--residual-mode",
+        choices=["gaussian_highpass", "radial_median", "radial_median_bandpass"],
+        default="radial_median",
+    )
     rxcj2248.add_argument("--radial-bin-arcsec", type=float, default=8.0)
     rxcj2248.add_argument("--cluster-z-min", type=float, default=0.35)
     rxcj2248.add_argument("--cluster-z-max", type=float, default=0.45)
@@ -2218,7 +2302,11 @@ def build_parser() -> argparse.ArgumentParser:
     combined.add_argument("--ring-inner-arcsec", type=float, default=5.0)
     combined.add_argument("--ring-outer-arcsec", type=float, default=9.0)
     combined.add_argument("--smooth-sigma-px", type=float, default=18.0)
-    combined.add_argument("--residual-mode", choices=["gaussian_highpass", "radial_median"], default="radial_median")
+    combined.add_argument(
+        "--residual-mode",
+        choices=["gaussian_highpass", "radial_median", "radial_median_bandpass"],
+        default="radial_median",
+    )
     combined.add_argument("--radial-bin-arcsec", type=float, default=8.0)
     combined.add_argument("--cluster-z-min", type=float, default=0.35)
     combined.add_argument("--cluster-z-max", type=float, default=0.45)
@@ -2240,8 +2328,8 @@ def build_parser() -> argparse.ArgumentParser:
     robustness.add_argument(
         "--residual-modes",
         nargs="+",
-        choices=["gaussian_highpass", "radial_median"],
-        default=["gaussian_highpass", "radial_median"],
+        choices=["gaussian_highpass", "radial_median", "radial_median_bandpass"],
+        default=["gaussian_highpass", "radial_median", "radial_median_bandpass"],
     )
     robustness.add_argument("--radial-bin-arcsec", type=float, default=8.0)
     robustness.add_argument("--cluster-z-min", type=float, default=0.35)
@@ -2261,7 +2349,11 @@ def build_parser() -> argparse.ArgumentParser:
     full_experiment.add_argument("--ring-inner-arcsec", type=float, default=5.0)
     full_experiment.add_argument("--ring-outer-arcsec", type=float, default=9.0)
     full_experiment.add_argument("--smooth-sigma-px", type=float, default=18.0)
-    full_experiment.add_argument("--residual-mode", choices=["gaussian_highpass", "radial_median"], default="radial_median")
+    full_experiment.add_argument(
+        "--residual-mode",
+        choices=["gaussian_highpass", "radial_median", "radial_median_bandpass"],
+        default="radial_median",
+    )
     full_experiment.add_argument("--radial-bin-arcsec", type=float, default=8.0)
     full_experiment.add_argument("--cluster-z-min", type=float, default=0.35)
     full_experiment.add_argument("--cluster-z-max", type=float, default=0.45)

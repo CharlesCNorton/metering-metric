@@ -18,10 +18,12 @@ abell370_validation/
 rxcj2248_firstpass/
 combined_firstpass/
 combined_firstpass_buffalo/
+combined_firstpass_bandpass/
 robustness_sweep/
 full_experiment/
 full_experiment_proxy/
 full_experiment_buffalo/
+full_experiment_bandpass/
 proxy_catalog_inspect/
 tmp_inputs/
 
