@@ -74,6 +74,48 @@ def gaussian_source(r: np.ndarray, amplitude: float, sigma: float) -> np.ndarray
     return amplitude * np.exp(-(r * r) / (2.0 * sigma * sigma))
 
 
+def beta_model_source(r: np.ndarray, amplitude: float, core_radius: float, beta_index: float) -> np.ndarray:
+    scale = np.maximum(core_radius, 1.0e-12)
+    return amplitude * np.power(1.0 + (r / scale) ** 2, -1.5 * beta_index)
+
+
+def softened_nfw_source(
+    r: np.ndarray,
+    amplitude: float,
+    core_radius: float,
+    scale_radius: float,
+    outer_slope: float,
+) -> np.ndarray:
+    core = np.maximum(core_radius, 1.0e-12)
+    scale = np.maximum(scale_radius, core)
+    return amplitude / ((1.0 + (r / core)) * np.power(1.0 + (r / scale), outer_slope - 1.0))
+
+
+def build_source_profile_values(
+    radii: np.ndarray,
+    source_kind: str,
+    source_amplitude: float,
+    source_sigma: float,
+    source_core_radius: float,
+    source_scale_radius: float,
+    source_beta: float,
+    source_outer_slope: float,
+) -> np.ndarray:
+    if source_kind == "gaussian":
+        return gaussian_source(radii, amplitude=source_amplitude, sigma=source_sigma)
+    if source_kind == "beta_model":
+        return beta_model_source(radii, amplitude=source_amplitude, core_radius=source_core_radius, beta_index=source_beta)
+    if source_kind == "softened_nfw":
+        return softened_nfw_source(
+            radii,
+            amplitude=source_amplitude,
+            core_radius=source_core_radius,
+            scale_radius=source_scale_radius,
+            outer_slope=source_outer_slope,
+        )
+    raise ValueError(f"Unknown source_kind: {source_kind}")
+
+
 def reverse_cumulative_trapezoid(values: np.ndarray, grid: np.ndarray) -> np.ndarray:
     result = np.zeros_like(values)
     if values.size > 1:
@@ -82,19 +124,20 @@ def reverse_cumulative_trapezoid(values: np.ndarray, grid: np.ndarray) -> np.nda
     return result
 
 
-def solve_screened_poisson_profile(
-    source_amplitude: float,
-    source_sigma: float,
+def solve_screened_poisson_profile_from_source(
+    source: np.ndarray,
     screening_mass: float,
     profile_r_max: float,
     profile_samples: int,
+    source_metadata: dict[str, float | str],
 ) -> SphericalMeteringProfile:
     if profile_samples < 5:
         raise ValueError("profile_samples must be at least 5.")
 
     radii = np.linspace(0.0, profile_r_max, profile_samples, dtype=float)
     step = float(radii[1] - radii[0])
-    source = gaussian_source(radii, amplitude=source_amplitude, sigma=source_sigma)
+    if source.shape != radii.shape:
+        raise ValueError("source must have the same shape as the radial grid.")
 
     interior_radii = radii[1:-1]
     interior_count = interior_radii.size
@@ -123,14 +166,76 @@ def solve_screened_poisson_profile(
         mu_prime=mu_prime,
         screening_mass=screening_mass,
         metadata={
-            "source_amplitude": float(source_amplitude),
-            "source_sigma": float(source_sigma),
             "profile_r_max": float(profile_r_max),
             "profile_samples": float(profile_samples),
             "max_mu": float(np.max(mu)),
             "max_source": float(np.max(source)),
             "max_field_equation_residual": float(np.max(np.abs(residual))),
+            **source_metadata,
         },
+    )
+
+
+def solve_screened_poisson_profile(
+    source_amplitude: float,
+    source_sigma: float,
+    screening_mass: float,
+    profile_r_max: float,
+    profile_samples: int,
+) -> SphericalMeteringProfile:
+    radii = np.linspace(0.0, profile_r_max, profile_samples, dtype=float)
+    source = gaussian_source(radii, amplitude=source_amplitude, sigma=source_sigma)
+    return solve_screened_poisson_profile_from_source(
+        source=source,
+        screening_mass=screening_mass,
+        profile_r_max=profile_r_max,
+        profile_samples=profile_samples,
+        source_metadata={
+            "source_kind": "gaussian",
+            "source_amplitude": float(source_amplitude),
+            "source_sigma": float(source_sigma),
+        },
+    )
+
+
+def solve_screened_poisson_cluster_profile(
+    source_kind: str,
+    source_amplitude: float,
+    source_sigma: float,
+    source_core_radius: float,
+    source_scale_radius: float,
+    source_beta: float,
+    source_outer_slope: float,
+    screening_mass: float,
+    profile_r_max: float,
+    profile_samples: int,
+) -> SphericalMeteringProfile:
+    radii = np.linspace(0.0, profile_r_max, profile_samples, dtype=float)
+    source = build_source_profile_values(
+        radii=radii,
+        source_kind=source_kind,
+        source_amplitude=source_amplitude,
+        source_sigma=source_sigma,
+        source_core_radius=source_core_radius,
+        source_scale_radius=source_scale_radius,
+        source_beta=source_beta,
+        source_outer_slope=source_outer_slope,
+    )
+    metadata: dict[str, float | str] = {
+        "source_kind": source_kind,
+        "source_amplitude": float(source_amplitude),
+        "source_sigma": float(source_sigma),
+        "source_core_radius": float(source_core_radius),
+        "source_scale_radius": float(source_scale_radius),
+        "source_beta": float(source_beta),
+        "source_outer_slope": float(source_outer_slope),
+    }
+    return solve_screened_poisson_profile_from_source(
+        source=source,
+        screening_mass=screening_mass,
+        profile_r_max=profile_r_max,
+        profile_samples=profile_samples,
+        source_metadata=metadata,
     )
 
 
@@ -286,6 +391,98 @@ def metering_stress_energy(
     return rho, radial_pressure, tangential_pressure
 
 
+def determine_exterior_matching_index(
+    profile: SphericalMeteringProfile,
+    rho: np.ndarray,
+    mass_function: np.ndarray,
+    tolerance: float,
+) -> int:
+    max_source = max(float(np.max(profile.source)), 1.0e-30)
+    max_rho = max(float(np.max(rho)), 1.0e-30)
+    total_mass = max(float(mass_function[-1]), 1.0e-30)
+    source_ratio = profile.source / max_source
+    rho_ratio = rho / max_rho
+    tail_fraction = np.maximum(total_mass - mass_function, 0.0) / total_mass
+    candidate = np.where(
+        (source_ratio <= tolerance)
+        & (rho_ratio <= tolerance)
+        & (tail_fraction <= tolerance)
+    )[0]
+    if candidate.size == 0:
+        return len(profile.radii) - 1
+    first = int(candidate[0])
+    return max(first, 2)
+
+
+def einstein_scalar_backreaction_metric_from_profile(
+    profile: SphericalMeteringProfile,
+    density_scale: float,
+    gravity_scale: float,
+    exterior_match_tolerance: float = 1.0e-6,
+) -> StaticSphericalPhotonMetric:
+    radii = profile.radii
+    safe_radii = np.maximum(radii, 1.0e-8)
+    rho, radial_pressure, _ = metering_stress_energy(profile, density_scale=density_scale)
+    source_density = 4.0 * math.pi * gravity_scale * radii * radii * rho
+    mass_function = cumulative_trapezoid(source_density, radii, initial=0.0)
+    compactness = 2.0 * mass_function / safe_radii
+    compactness[0] = 0.0
+    denominator = np.maximum(safe_radii * np.maximum(safe_radii - 2.0 * mass_function, 1.0e-10), 1.0e-10)
+    phi_prime = (mass_function + 4.0 * math.pi * gravity_scale * radii * radii * radii * radial_pressure) / denominator
+    phi_prime[0] = 0.0
+    phi = -reverse_cumulative_trapezoid(phi_prime, radii)
+
+    match_index = determine_exterior_matching_index(profile, rho=rho, mass_function=mass_function, tolerance=exterior_match_tolerance)
+    match_radius = float(radii[match_index])
+    match_mass = float(mass_function[match_index])
+    exterior_lapse_match = max(1.0 - (2.0 * match_mass / max(match_radius, 1.0e-10)), 1.0e-12)
+    phi = phi - phi[match_index] + 0.5 * math.log(exterior_lapse_match)
+
+    lapse_values = np.maximum(np.exp(2.0 * phi), 1.0e-8)
+    radial_values = 1.0 / np.maximum(1.0 - compactness, 1.0e-8)
+    radial_values[0] = radial_values[1]
+
+    interior_radii = radii[: match_index + 1]
+    interior_lapse = lapse_values[: match_index + 1]
+    interior_radial = radial_values[: match_index + 1]
+    r_min = max(float(interior_radii[1]), 1.0e-6)
+
+    def lapse_A(r: float) -> float:
+        if r >= match_radius:
+            return float(max(1.0 - (2.0 * match_mass / max(r, 1.0e-10)), 1.0e-12))
+        return float(np.interp(r, interior_radii, interior_lapse, left=interior_lapse[1], right=interior_lapse[-1]))
+
+    def radial_B(r: float) -> float:
+        if r >= match_radius:
+            denom = max(1.0 - (2.0 * match_mass / max(r, 1.0e-10)), 1.0e-12)
+            return float(1.0 / denom)
+        return float(np.interp(r, interior_radii, interior_radial, left=interior_radial[1], right=interior_radial[-1]))
+
+    metadata = dict(profile.metadata)
+    metadata.update(
+        {
+            "density_scale": float(density_scale),
+            "gravity_scale": float(gravity_scale),
+            "max_energy_density": float(np.max(rho)),
+            "max_radial_pressure": float(np.max(radial_pressure)),
+            "max_compactness_2GM_over_r": float(np.max(compactness)),
+            "minimum_photon_lapse": float(np.min(np.sqrt(interior_lapse))),
+            "gravity_scaled_mass": float(mass_function[-1]),
+            "exterior_match_radius": match_radius,
+            "exterior_match_mass": match_mass,
+            "exterior_match_tolerance": float(exterior_match_tolerance),
+        }
+    )
+    return StaticSphericalPhotonMetric(
+        name="einstein_scalar_backreaction",
+        lapse_A=lapse_A,
+        radial_B=radial_B,
+        r_min=r_min,
+        asymptotic_lapse=1.0,
+        metadata=metadata,
+    )
+
+
 def einstein_scalar_backreaction_metric(
     source_amplitude: float,
     source_sigma: float,
@@ -302,51 +499,10 @@ def einstein_scalar_backreaction_metric(
         profile_r_max=profile_r_max,
         profile_samples=profile_samples,
     )
-    radii = profile.radii
-    safe_radii = np.maximum(radii, 1.0e-8)
-    rho, radial_pressure, _ = metering_stress_energy(profile, density_scale=density_scale)
-    source_density = 4.0 * math.pi * gravity_scale * radii * radii * rho
-    mass_function = cumulative_trapezoid(source_density, radii, initial=0.0)
-    compactness = 2.0 * mass_function / safe_radii
-    compactness[0] = 0.0
-    denominator = np.maximum(safe_radii * np.maximum(safe_radii - 2.0 * mass_function, 1.0e-10), 1.0e-10)
-    phi_prime = (mass_function + 4.0 * math.pi * gravity_scale * radii * radii * radii * radial_pressure) / denominator
-    phi_prime[0] = 0.0
-    phi = -reverse_cumulative_trapezoid(phi_prime, radii)
-    exterior_boundary_phi = 0.5 * math.log(max(1.0 - (2.0 * mass_function[-1] / max(radii[-1], 1.0e-10)), 1.0e-12))
-    phi = phi - phi[-1] + exterior_boundary_phi
-
-    lapse_values = np.maximum(np.exp(2.0 * phi), 1.0e-8)
-    radial_values = 1.0 / np.maximum(1.0 - compactness, 1.0e-8)
-    radial_values[0] = radial_values[1]
-
-    r_min = max(float(radii[1]), 1.0e-6)
-
-    def lapse_A(r: float) -> float:
-        return float(np.interp(r, radii, lapse_values, left=lapse_values[1], right=1.0))
-
-    def radial_B(r: float) -> float:
-        return float(np.interp(r, radii, radial_values, left=radial_values[1], right=1.0))
-
-    metadata = dict(profile.metadata)
-    metadata.update(
-        {
-            "density_scale": float(density_scale),
-            "gravity_scale": float(gravity_scale),
-            "max_energy_density": float(np.max(rho)),
-            "max_radial_pressure": float(np.max(radial_pressure)),
-            "max_compactness_2GM_over_r": float(np.max(compactness)),
-            "minimum_photon_lapse": float(np.min(np.sqrt(lapse_values))),
-            "gravity_scaled_mass": float(mass_function[-1]),
-        }
-    )
-    return StaticSphericalPhotonMetric(
-        name="einstein_scalar_backreaction",
-        lapse_A=lapse_A,
-        radial_B=radial_B,
-        r_min=r_min,
-        asymptotic_lapse=1.0,
-        metadata=metadata,
+    return einstein_scalar_backreaction_metric_from_profile(
+        profile=profile,
+        density_scale=density_scale,
+        gravity_scale=gravity_scale,
     )
 
 
@@ -570,6 +726,102 @@ def weak_field_schwarzschild_benchmark(mass: float, impact_parameter: float, r_m
         "weak_field_prediction_rad": weak_field,
         "fractional_error_vs_4M_over_b": abs(measured["deflection_angle_rad"] - weak_field) / weak_field,
     }
+
+
+def sample_axisymmetric_lensing_profile(
+    metric: StaticSphericalPhotonMetric,
+    impact_min: float,
+    impact_max: float,
+    samples: int,
+    r_max: float,
+) -> dict:
+    if samples < 5:
+        raise ValueError("samples must be at least 5.")
+    impact_min = max(impact_min, metric.r_min * 1.01)
+    impacts = np.geomspace(impact_min, impact_max, samples)
+    deflections = np.zeros_like(impacts)
+    delays = np.zeros_like(impacts)
+    turning_radii = np.zeros_like(impacts)
+
+    for idx, impact in enumerate(impacts):
+        deflection = photon_deflection_angle(metric, impact_parameter=float(impact), r_max=r_max)
+        timing = photon_coordinate_time(metric, impact_parameter=float(impact), r_observer=r_max)
+        deflections[idx] = deflection["deflection_angle_rad"]
+        delays[idx] = timing["excess_roundtrip_time"]
+        turning_radii[idx] = deflection["turning_radius"]
+
+    derivative = np.gradient(deflections, impacts, edge_order=2)
+    convergence = 0.5 * (derivative + (deflections / impacts))
+    shear_tangential = 0.5 * ((deflections / impacts) - derivative)
+    magnification_inverse = (1.0 - convergence) ** 2 - shear_tangential**2
+    threshold = max(1.0e-12, 1.0e-4 * float(np.max(np.abs(convergence))))
+    convergence_resolved = np.where(np.abs(convergence) >= threshold, convergence, 0.0)
+    sign_change_indices = np.where(np.signbit(convergence_resolved[:-1]) != np.signbit(convergence_resolved[1:]))[0]
+    sign_flip_radii = [float(0.5 * (impacts[idx] + impacts[idx + 1])) for idx in sign_change_indices]
+
+    return {
+        "impact_parameters": impacts.tolist(),
+        "turning_radii": turning_radii.tolist(),
+        "deflection_angle_rad": deflections.tolist(),
+        "excess_roundtrip_time": delays.tolist(),
+        "convergence": convergence.tolist(),
+        "shear_tangential": shear_tangential.tolist(),
+        "magnification_inverse": magnification_inverse.tolist(),
+        "sign_flip_radii": sign_flip_radii,
+        "convergence_min": float(np.min(convergence)),
+        "convergence_max": float(np.max(convergence)),
+        "negative_convergence_fraction": float(np.mean(convergence < 0.0)),
+        "resolved_zero_threshold": threshold,
+        "negative_convergence_fraction_resolved": float(np.mean(convergence_resolved < 0.0)),
+    }
+
+
+def build_axisymmetric_lensing_map(
+    radial_profile: dict,
+    extent: float,
+    grid_size: int,
+    include_arrays: bool,
+) -> dict:
+    if grid_size < 5:
+        raise ValueError("grid_size must be at least 5.")
+    impacts = np.asarray(radial_profile["impact_parameters"], dtype=float)
+    convergence = np.asarray(radial_profile["convergence"], dtype=float)
+    shear_tangential = np.asarray(radial_profile["shear_tangential"], dtype=float)
+    xs = np.linspace(-extent, extent, grid_size)
+    ys = np.linspace(-extent, extent, grid_size)
+    x_grid, y_grid = np.meshgrid(xs, ys)
+    radius_grid = np.sqrt(x_grid * x_grid + y_grid * y_grid)
+    max_impact = float(impacts[-1])
+    clipped_radius = np.clip(radius_grid, impacts[0], max_impact)
+    kappa_grid = np.interp(clipped_radius, impacts, convergence)
+    gamma_t_grid = np.interp(clipped_radius, impacts, shear_tangential)
+    threshold = max(1.0e-12, 1.0e-4 * float(np.max(np.abs(convergence))))
+    kappa_resolved = np.where(np.abs(kappa_grid) >= threshold, kappa_grid, 0.0)
+    phi_grid = np.arctan2(y_grid, x_grid)
+    gamma1_grid = -gamma_t_grid * np.cos(2.0 * phi_grid)
+    gamma2_grid = -gamma_t_grid * np.sin(2.0 * phi_grid)
+
+    result = {
+        "extent": float(extent),
+        "grid_size": int(grid_size),
+        "kappa_min": float(np.min(kappa_grid)),
+        "kappa_max": float(np.max(kappa_grid)),
+        "gamma_t_max": float(np.max(np.abs(gamma_t_grid))),
+        "negative_kappa_fraction": float(np.mean(kappa_grid < 0.0)),
+        "resolved_zero_threshold": threshold,
+        "negative_kappa_fraction_resolved": float(np.mean(kappa_resolved < 0.0)),
+    }
+    if include_arrays:
+        result.update(
+            {
+                "x_coordinates": xs.tolist(),
+                "y_coordinates": ys.tolist(),
+                "kappa_map": kappa_grid.tolist(),
+                "gamma1_map": gamma1_grid.tolist(),
+                "gamma2_map": gamma2_grid.tolist(),
+            }
+        )
+    return result
 
 
 def asymptotic_speed_delta(metric: StaticSphericalPhotonMetric) -> dict:
@@ -897,6 +1149,48 @@ def command_constraint_audit(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def command_cluster_map(args: argparse.Namespace) -> None:
+    profile = solve_screened_poisson_cluster_profile(
+        source_kind=args.source_kind,
+        source_amplitude=args.source_amplitude,
+        source_sigma=args.source_sigma,
+        source_core_radius=args.source_core_radius,
+        source_scale_radius=args.source_scale_radius,
+        source_beta=args.source_beta,
+        source_outer_slope=args.source_outer_slope,
+        screening_mass=args.screening_mass,
+        profile_r_max=args.profile_r_max,
+        profile_samples=args.profile_samples,
+    )
+    metric = einstein_scalar_backreaction_metric_from_profile(
+        profile=profile,
+        density_scale=args.density_scale,
+        gravity_scale=args.gravity_scale,
+        exterior_match_tolerance=args.exterior_match_tolerance,
+    )
+    radial_profile = sample_axisymmetric_lensing_profile(
+        metric,
+        impact_min=args.impact_min,
+        impact_max=args.impact_max,
+        samples=args.radial_samples,
+        r_max=args.r_max,
+    )
+    map_payload = build_axisymmetric_lensing_map(
+        radial_profile=radial_profile,
+        extent=args.map_extent,
+        grid_size=args.grid_size,
+        include_arrays=args.include_map_arrays,
+    )
+    result = {
+        "scenario": "cluster_einstein_map",
+        "source_profile": profile.metadata,
+        "metric_metadata": metric.metadata,
+        "radial_profile": radial_profile,
+        "map": map_payload,
+    }
+    print(json.dumps(result, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Evaluate 3+1D photon observables for static spherical metrics.",
@@ -978,6 +1272,29 @@ def build_parser() -> argparse.ArgumentParser:
     audit.add_argument("--profile-r-max", type=float, default=5.0e3)
     audit.add_argument("--profile-samples", type=int, default=4096)
     audit.set_defaults(func=command_constraint_audit)
+
+    cluster_map = subparsers.add_parser("cluster-map", help="Build axisymmetric Einstein-branch lensing maps for cluster-style source profiles.")
+    cluster_map.add_argument("--source-kind", choices=["gaussian", "beta_model", "softened_nfw"], default="softened_nfw")
+    cluster_map.add_argument("--source-amplitude", type=float, default=1.0e-3)
+    cluster_map.add_argument("--source-sigma", type=float, default=120.0)
+    cluster_map.add_argument("--source-core-radius", type=float, default=60.0)
+    cluster_map.add_argument("--source-scale-radius", type=float, default=350.0)
+    cluster_map.add_argument("--source-beta", type=float, default=0.8)
+    cluster_map.add_argument("--source-outer-slope", type=float, default=3.0)
+    cluster_map.add_argument("--screening-mass", type=float, default=0.01)
+    cluster_map.add_argument("--density-scale", type=float, default=1.0e-6)
+    cluster_map.add_argument("--gravity-scale", type=float, default=1.0)
+    cluster_map.add_argument("--exterior-match-tolerance", type=float, default=1.0e-6)
+    cluster_map.add_argument("--profile-r-max", type=float, default=8.0e3)
+    cluster_map.add_argument("--profile-samples", type=int, default=4096)
+    cluster_map.add_argument("--impact-min", type=float, default=30.0)
+    cluster_map.add_argument("--impact-max", type=float, default=4.0e3)
+    cluster_map.add_argument("--radial-samples", type=int, default=64)
+    cluster_map.add_argument("--r-max", type=float, default=8.0e4)
+    cluster_map.add_argument("--map-extent", type=float, default=4.0e3)
+    cluster_map.add_argument("--grid-size", type=int, default=65)
+    cluster_map.add_argument("--include-map-arrays", action="store_true")
+    cluster_map.set_defaults(func=command_cluster_map)
 
     return parser
 
