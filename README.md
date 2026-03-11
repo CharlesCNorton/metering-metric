@@ -44,7 +44,7 @@ This repository mixes several different kinds of support, and they should not be
 - **Computationally checked:** the lattice, PDE, and cosmology sections are supported by numerical experiments and symbolic derivations, not by formal proof.
 - **Hardware-backed:** the IBM Quantum section is evidence for discrete bound-state structure in the tested lattice model, not a direct measurement of the physical spacetime coupling constant.
 - **Archival observational program:** the cluster-lensing section currently runs on two HFF fields, a hardened radial-median-bandpass residual, BUFFALO v2 photometric catalogs, public MUSE spectroscopic catalogs, deeper external spectroscopy for membership hardening, public `MUSE-DEEP` core-cube extractions, and 22 independent lens-model families. The sign-flip morphology survives those checks. The most stable explanatory axes are local convergence and stellar mass. Generic spectroscopic structure, line-ratio proxies, first strong-line metallicity estimators, and the current public matched-depth core-cube route do not yield a same-sign replicated abundance-style proxy across both clusters under the present controls.
-- **Open empirical question:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies beyond mass and local convergence remain open. The immediate observational target is same-sign conditional replication across clusters and model families using data with genuinely shared proxy coverage.
+- **Open empirical question:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies beyond mass and local convergence remain open. The observational proxy lane is exhausted on current public data. Two later observational pursuits remain well-defined: redder symmetric spectroscopy for both clusters with usable `Halpha`, `[N II]`, `Hbeta`, and `[O III]` coverage, and direct per-galaxy abundance tables with one-to-one mapping into the HFF member catalogs. Until such data exist, the active focus shifts to deriving the 3+1D lensing observable from the field equations.
 
 ---
 
@@ -398,7 +398,7 @@ The stronger spectroscopic pass is more informative, but it does not yet produce
 
 The first direct strong-line metallicity pass has now also been carried through using public MUSE line catalogs. In `Abell 370`, `N2` and Marino et al. (2013) oxygen-abundance estimators are mildly positive but not significant once mass, redshift, magnification, radius, and `local_kappa` are controlled. In `RXC J2248 / Abell S1063`, the same estimators are effectively sample-limited under the current public coverage. Across the 22 model-family runs, `muse_n2` is positive in `6/22` and significant in `0/22` with median partial correlation `0.0304`; the Marino `O3N2` abundance estimator is positive in `7/22` and significant in `0/22` with median partial correlation `0.0672`; the Marino `N2` abundance estimator is positive in `4/22` and significant in `0/22` with median partial correlation `-0.0480`.
 
-The public matched-depth core-cube route has now been tested as well. Secure-redshift aperture extractions from the public `MUSE-DEEP` core cubes do not rescue the metallicity lane: the cubes cut off near `8850-8900 A`, so `Halpha/[N II]` fall out of band or effectively out of band at the cluster redshifts, and the remaining blue-line support is too thin to carry a two-cluster abundance test. In the current deep-cube extraction cache, `Abell 370` yields only `2` usable `R23` objects and `9` usable `O32` objects, while `RXC J2248 / Abell S1063` yields `0` usable `R23` objects and `1` usable `O32` object; `N2`, `O3N2`, and Marino-style abundance proxies remain unsupported in both clusters. That fixes the public-catalog observational program more tightly still. The next task is now genuinely redder or materially deeper spectroscopy, or direct abundance products, across both clusters, while keeping the hardened residual baseline and the same-sign conditional replication requirement against mass and `local_kappa`.
+The public matched-depth core-cube route has now been tested as well. Secure-redshift aperture extractions from the public `MUSE-DEEP` core cubes do not rescue the metallicity lane: the cubes cut off near `8850-8900 A`, so `Halpha/[N II]` fall out of band or effectively out of band at the cluster redshifts, and the remaining blue-line support is too thin to carry a two-cluster abundance test. In the current deep-cube extraction cache, `Abell 370` yields only `2` usable `R23` objects and `9` usable `O32` objects, while `RXC J2248 / Abell S1063` yields `0` usable `R23` objects and `1` usable `O32` object; `N2`, `O3N2`, and Marino-style abundance proxies remain unsupported in both clusters. That closes the observational proxy lane on current public data. Two later observational pursuits remain: redder symmetric spectroscopy across both clusters with usable `Halpha`, `[N II]`, `Hbeta`, and `[O III]`, and direct per-galaxy abundance tables mapped one-to-one into the HFF member catalogs. The active center of effort now shifts to the 3+1D lensing derivation.
 
 ### GW170817 Compatibility
 
@@ -443,11 +443,15 @@ The working archival lensing program now has three pieces:
 2. force every proposed proxy to compete against mass and local convergence under explicit controls,
 3. only expand the cluster sample after a proxy survives that conditional test.
 
-Within that program, the hardened residual baseline is now in place, stronger public spectroscopic catalogs have been tested, a first strong-line metallicity pass has been completed where line coverage allows, and the public matched-depth core-cube route has been pushed through secure-redshift aperture extraction. The next lensing step is not looser proxy fishing or more recombinations of the same public catalogs; it is redder or materially deeper spectroscopy, or direct abundance products, across both clusters, with same-sign replication across both clusters kept as the admission criterion.
+Within that program, the hardened residual baseline is now in place, stronger public spectroscopic catalogs have been tested, a first strong-line metallicity pass has been completed where line coverage allows, and the public matched-depth core-cube route has been pushed through secure-redshift aperture extraction. On current public data, that observational proxy lane is exhausted. The later observational pursuits are redder symmetric spectroscopy across both clusters and direct abundance products with one-to-one HFF mapping. The active lensing task is now the 3+1D derivation of the observable itself.
 
 ---
 
 ## Open Questions
+
+### 3+1D Lensing Observable
+
+The project now needs the actual lensing observable derived from a consistent 3+1D completion, not further proxy reshuffling on the current public archive. The central task is to write the covariant theory cleanly enough that photon propagation, lensing, and any claimed redshift effect can be computed from the field equations rather than inferred from lower-dimensional geometric intuition.
 
 ### The Coupling Constant
 
@@ -507,7 +511,7 @@ These are documented for completeness and to prevent others from repeating dead 
 
 **Born-Oppenheimer decomposition:** The BO decomposition of the Wheeler-DeWitt solution never cleanly demonstrated emergent time. The coefficient of variation remained above 0.85 in all tests. The toy minisuperspace model (120 x 120 grid) is too crude. This does not affect the main results (which are independent of the BO analysis).
 
-**Public strong-line and matched-depth metallicity passes:** The current public MUSE line catalogs are sufficient to construct a first `N2` / Marino-style abundance pass in `Abell 370`, but they remain too sparse in `RXC J2248 / Abell S1063` to support a symmetric two-cluster test. The public `MUSE-DEEP` core cubes are also now in hand and scriptable, but at the cluster redshifts their wavelength coverage ends before a viable two-cluster `Halpha/[N II]` abundance test, and the surviving blue-line support is too thin to substitute. The result is informative as a data-adequacy and wavelength-coverage bound, but it does not produce a replicated metallicity signal.
+**Public strong-line and matched-depth metallicity passes:** The current public MUSE line catalogs are sufficient to construct a first `N2` / Marino-style abundance pass in `Abell 370`, but they remain too sparse in `RXC J2248 / Abell S1063` to support a symmetric two-cluster test. The public `MUSE-DEEP` core cubes are also now in hand and scriptable, but at the cluster redshifts their wavelength coverage ends before a viable two-cluster `Halpha/[N II]` abundance test, and the surviving blue-line support is too thin to substitute. The result is informative as a data-adequacy and wavelength-coverage bound. The current public-data proxy lane is therefore exhausted; later observational pursuit requires redder symmetric spectroscopy or direct abundance tables.
 
 ---
 
@@ -535,7 +539,7 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Photon decoupling | Model consequence of the mass-term-only coupling |
 | Decoherence rate source criterion | Proposed and computationally explored; not observationally established |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
-| Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; current photometric, spectroscopic, strong-line metallicity, and public matched-depth core-cube abundance proxies do not replicate across both clusters |
+| Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; the public-data proxy lane is exhausted without a replicated abundance-style signal; active focus shifts to the 3+1D lensing derivation |
 | Coq formalization | Initial abstract theorem development complete; monolithic file compiles |
 | Physical $\alpha$ measurement | Open |
 
