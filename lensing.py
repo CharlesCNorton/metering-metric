@@ -145,6 +145,21 @@ HFF_MODEL_VERSIONS = {
     },
 }
 
+MUSE_DEEP_CORE_PRODUCTS = {
+    "abell370": {
+        "adp_id": "ADP.2017-06-06T13:13:38.674",
+        "dataset_url": "http://archive.eso.org/dataset/ADP.2017-06-06T13:13:38.674",
+        "datalink_url": "http://archive.eso.org/datalink/links?ID=ivo://eso.org/ID?ADP.2017-06-06T13:13:38.674",
+        "collection_name": "MUSE-DEEP",
+    },
+    "rxcj2248": {
+        "adp_id": "ADP.2017-03-23T15:58:03.937",
+        "dataset_url": "http://archive.eso.org/dataset/ADP.2017-03-23T15:58:03.937",
+        "datalink_url": "http://archive.eso.org/datalink/links?ID=ivo://eso.org/ID?ADP.2017-03-23T15:58:03.937",
+        "collection_name": "MUSE-DEEP",
+    },
+}
+
 BUFFALO_PROXY_BANDS = [
     ("FLUX_F275W", "FLUXERR_F275W", 0.275),
     ("FLUX_F336W", "FLUXERR_F336W", 0.336),
@@ -203,6 +218,24 @@ MUSE_OII_LINES = ("OII3727", "OII3729")
 MUSE_OIII_LINES = ("OIII4960", "OIII5008")
 MARINO2013_O3N2_RANGE = (-1.1, 1.7)
 MARINO2013_N2_RANGE = (-1.6, -0.2)
+MUSE_DEEP_CACHE_ROOT = Path(__file__).resolve().parent / "tmp_inputs" / "muse_deep_cube_cache"
+MUSE_DEEP_SODA_URL = "https://dataportal.eso.org/dataPortal/soda/sync"
+MUSE_DEEP_CUTOUT_RADIUS_DEG = 0.0004
+MUSE_DEEP_APERTURE_RADIUS_ARCSEC = 0.6
+MUSE_DEEP_BAND_METERS = (4.95e-7, 9.10e-7)
+MUSE_DEEP_MIN_LINE_SNR = 3.0
+MUSE_DEEP_LINE_HALF_WINDOW_ANGSTROM = 6.0
+MUSE_DEEP_CONTINUUM_INNER_HALF_WINDOW_ANGSTROM = 10.0
+MUSE_DEEP_CONTINUUM_OUTER_HALF_WINDOW_ANGSTROM = 25.0
+MUSE_DEEP_REST_WAVELENGTHS = {
+    "OII3727": 3727.09,
+    "OII3729": 3729.88,
+    "HBETA": 4861.33,
+    "OIII4960": 4958.91,
+    "OIII5008": 5006.84,
+    "HALPHA": 6562.80,
+    "NII6585": 6583.45,
+}
 
 
 def normalize_muse_line_name(name: str) -> str:
@@ -255,6 +288,34 @@ def marino2013_n2_oxygen_abundance(n2: float) -> float:
     if not (MARINO2013_N2_RANGE[0] <= n2 <= MARINO2013_N2_RANGE[1]):
         return float("nan")
     return float(8.743 + 0.462 * n2)
+
+
+def muse_ratio_proxy_values_from_flux_map(
+    line_flux_map: dict[str, float],
+    prefix: str,
+) -> dict[str, float | int]:
+    detected_fluxes = [float(value) for value in line_flux_map.values() if np.isfinite(value) and value > 0.0]
+    oii_flux = muse_sum_flux(line_flux_map, MUSE_OII_LINES)
+    oiii_flux = muse_sum_flux(line_flux_map, MUSE_OIII_LINES)
+    hbeta_flux = muse_sum_flux(line_flux_map, ("HBETA",))
+    halpha_flux = muse_sum_flux(line_flux_map, ("HALPHA",))
+    nii6585_flux = muse_sum_flux(line_flux_map, ("NII6585",))
+    oiii5008_flux = muse_sum_flux(line_flux_map, ("OIII5008",))
+    n2_ratio = muse_log10_ratio(nii6585_flux, halpha_flux)
+    o3n2_ratio = muse_log10_ratio(oiii5008_flux * halpha_flux, hbeta_flux * nii6585_flux)
+    emission_strength = float(math.log10(1.0 + np.sum(detected_fluxes))) if detected_fluxes else float("nan")
+    return {
+        f"{prefix}_line_count_proxy": float(len(detected_fluxes)),
+        f"{prefix}_emission_strength_proxy": emission_strength,
+        f"{prefix}_r23_proxy": muse_log10_ratio(oii_flux + oiii_flux, hbeta_flux),
+        f"{prefix}_o32_proxy": muse_log10_ratio(oiii_flux, oii_flux),
+        f"{prefix}_o3n2_proxy": o3n2_ratio,
+        f"{prefix}_n2_proxy": n2_ratio,
+        f"{prefix}_balmer_decrement_proxy": muse_log10_ratio(halpha_flux, hbeta_flux),
+        f"{prefix}_m13_o3n2_oxygen_abundance": marino2013_o3n2_oxygen_abundance(o3n2_ratio),
+        f"{prefix}_m13_n2_oxygen_abundance": marino2013_n2_oxygen_abundance(n2_ratio),
+        f"{prefix}_detected_line_count": int(len(detected_fluxes)),
+    }
 
 
 def nanmedian_or_nan(values: Iterable[float]) -> float:
@@ -483,6 +544,207 @@ def download_file(url: str, path: Path) -> Path:
                 if chunk:
                     handle.write(chunk)
     return path
+
+
+def download_eso_soda_cutout(
+    adp_id: str,
+    ra: float,
+    dec: float,
+    radius_deg: float,
+    out_path: Path,
+) -> Path:
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if out_path.exists():
+        return out_path
+    tmp_path = out_path.with_suffix(out_path.suffix + ".tmp")
+    if tmp_path.exists():
+        tmp_path.unlink()
+    params = {
+        "ID": f"ivo://eso.org/ID?{adp_id}",
+        "CIRCLE": f"{ra:.8f} {dec:.8f} {radius_deg:.6f}",
+        "BAND": f"{MUSE_DEEP_BAND_METERS[0]:.8e} {MUSE_DEEP_BAND_METERS[1]:.8e}",
+    }
+    with requests.get(MUSE_DEEP_SODA_URL, params=params, stream=True, timeout=300) as response:
+        response.raise_for_status()
+        with tmp_path.open("wb") as handle:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    handle.write(chunk)
+    tmp_path.replace(out_path)
+    return out_path
+
+
+def wavelength_axis_angstrom(header: fits.Header, n_spec: int) -> np.ndarray:
+    delta = header.get("CD3_3", header.get("CDELT3"))
+    if delta is None:
+        raise KeyError("Cube header is missing CD3_3/CDELT3.")
+    return float(header["CRVAL3"]) + np.arange(n_spec, dtype=float) * float(delta)
+
+
+def extract_aperture_spectrum_from_cutout(
+    cutout_path: Path,
+    ra: float,
+    dec: float,
+    aperture_radius_arcsec: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    with fits.open(cutout_path, memmap=True) as hdul:
+        data = np.asarray(hdul["DATA"].data, dtype=float)
+        stat = np.asarray(hdul["STAT"].data, dtype=float)
+        header = hdul["DATA"].header
+
+    wcs = WCS(header).celestial
+    xpix, ypix = wcs.world_to_pixel_values(ra, dec)
+    pixel_scale_arcsec = abs(float(header.get("CD1_1", header.get("CDELT1")))) * 3600.0
+    aperture_radius_px = aperture_radius_arcsec / pixel_scale_arcsec
+    yy, xx = np.indices(data.shape[1:])
+    aperture_mask = ((xx - xpix) ** 2 + (yy - ypix) ** 2) <= aperture_radius_px**2
+    if not np.any(aperture_mask):
+        return np.asarray([]), np.asarray([]), np.asarray([])
+
+    flux_density = np.nansum(data[:, aperture_mask], axis=1)
+    variance_density = np.nansum(stat[:, aperture_mask], axis=1)
+    wavelengths = wavelength_axis_angstrom(header, data.shape[0])
+    return wavelengths, flux_density, variance_density
+
+
+def measure_muse_emission_line_flux(
+    wavelengths: np.ndarray,
+    flux_density: np.ndarray,
+    variance_density: np.ndarray,
+    observed_wavelength: float,
+    line_half_window_angstrom: float = MUSE_DEEP_LINE_HALF_WINDOW_ANGSTROM,
+    continuum_inner_half_window_angstrom: float = MUSE_DEEP_CONTINUUM_INNER_HALF_WINDOW_ANGSTROM,
+    continuum_outer_half_window_angstrom: float = MUSE_DEEP_CONTINUUM_OUTER_HALF_WINDOW_ANGSTROM,
+) -> tuple[float, float]:
+    if wavelengths.size == 0:
+        return float("nan"), float("nan")
+
+    offset = wavelengths - observed_wavelength
+    line_mask = np.abs(offset) <= line_half_window_angstrom
+    continuum_mask = (np.abs(offset) >= continuum_inner_half_window_angstrom) & (
+        np.abs(offset) <= continuum_outer_half_window_angstrom
+    )
+    finite_continuum = continuum_mask & np.isfinite(flux_density) & np.isfinite(variance_density) & (variance_density > 0.0)
+    finite_line = line_mask & np.isfinite(flux_density) & np.isfinite(variance_density) & (variance_density > 0.0)
+    if np.count_nonzero(finite_continuum) < 6 or np.count_nonzero(finite_line) < 3:
+        return float("nan"), float("nan")
+
+    x = offset[finite_continuum]
+    y = flux_density[finite_continuum]
+    weights = 1.0 / variance_density[finite_continuum]
+    design = np.column_stack([np.ones_like(x), x])
+    weighted_design = design * np.sqrt(weights)[:, None]
+    weighted_response = y * np.sqrt(weights)
+    beta = np.linalg.lstsq(weighted_design, weighted_response, rcond=None)[0]
+
+    line_x = offset[finite_line]
+    line_flux_density = flux_density[finite_line]
+    line_variance_density = variance_density[finite_line]
+    continuum = beta[0] + beta[1] * line_x
+    delta_lambda = float(np.median(np.diff(wavelengths)))
+    integrated_flux = float(np.sum((line_flux_density - continuum) * delta_lambda))
+    integrated_variance = float(np.sum(line_variance_density) * delta_lambda**2)
+    if not np.isfinite(integrated_flux) or not np.isfinite(integrated_variance) or integrated_variance <= 0.0:
+        return float("nan"), float("nan")
+    return integrated_flux, float(integrated_flux / math.sqrt(integrated_variance))
+
+
+def load_muse_deep_proxy_lookup(
+    cluster_key: str,
+    catalog_path: Path,
+    deep_spec_lookup: dict[int, dict],
+) -> dict[int, dict]:
+    cache_dir = MUSE_DEEP_CACHE_ROOT / cluster_key
+    cache_path = cache_dir / "muse_deep_proxy_lookup.json"
+    if cache_path.exists():
+        payload = json.loads(cache_path.read_text(encoding="utf-8"))
+        return {int(key): value for key, value in payload["lookup"].items()}
+
+    with fits.open(catalog_path) as hdul:
+        hff_rows = hdul[1].data
+
+    product = MUSE_DEEP_CORE_PRODUCTS[cluster_key]
+    lookup: dict[int, dict] = {}
+    for record in hff_rows:
+        idcat = int(record["IDcat"])
+        deep_spec_info = deep_spec_lookup.get(idcat, {})
+        if int(deep_spec_info.get("deep_spec_cluster_member", 0)) != 1:
+            continue
+        redshift = float(deep_spec_info["deep_spec_redshift"])
+        quality = float(deep_spec_info.get("deep_spec_quality", float("nan")))
+        ra = float(record["alpha_j2000"])
+        dec = float(record["delta_j2000"])
+        cutout_path = download_eso_soda_cutout(
+            adp_id=product["adp_id"],
+            ra=ra,
+            dec=dec,
+            radius_deg=MUSE_DEEP_CUTOUT_RADIUS_DEG,
+            out_path=cache_dir / "cutouts" / f"{cluster_key}_{idcat}.fits",
+        )
+        try:
+            wavelengths, flux_density, variance_density = extract_aperture_spectrum_from_cutout(
+                cutout_path=cutout_path,
+                ra=ra,
+                dec=dec,
+                aperture_radius_arcsec=MUSE_DEEP_APERTURE_RADIUS_ARCSEC,
+            )
+        except OSError:
+            if cutout_path.exists():
+                cutout_path.unlink()
+            try:
+                cutout_path = download_eso_soda_cutout(
+                    adp_id=product["adp_id"],
+                    ra=ra,
+                    dec=dec,
+                    radius_deg=MUSE_DEEP_CUTOUT_RADIUS_DEG,
+                    out_path=cutout_path,
+                )
+                wavelengths, flux_density, variance_density = extract_aperture_spectrum_from_cutout(
+                    cutout_path=cutout_path,
+                    ra=ra,
+                    dec=dec,
+                    aperture_radius_arcsec=MUSE_DEEP_APERTURE_RADIUS_ARCSEC,
+                )
+            except OSError:
+                continue
+        line_flux_map: dict[str, float] = {}
+        for line_name, rest_wavelength in MUSE_DEEP_REST_WAVELENGTHS.items():
+            observed_wavelength = rest_wavelength * (1.0 + redshift)
+            line_flux, line_snr = measure_muse_emission_line_flux(
+                wavelengths=wavelengths,
+                flux_density=flux_density,
+                variance_density=variance_density,
+                observed_wavelength=observed_wavelength,
+            )
+            if not np.isfinite(line_flux) or not np.isfinite(line_snr):
+                continue
+            if line_flux <= 0.0 or line_snr < MUSE_DEEP_MIN_LINE_SNR:
+                continue
+            line_flux_map[line_name] = line_flux
+
+        proxy_values = muse_ratio_proxy_values_from_flux_map(line_flux_map, prefix="muse_deep")
+        lookup[idcat] = {
+            **proxy_values,
+            "muse_deep_match_sep_arcsec": 0.0,
+            "muse_deep_redshift": redshift,
+            "muse_deep_redshift_quality": quality,
+            "muse_deep_catalog_name": product["collection_name"],
+        }
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(
+        json.dumps(
+            {
+                "cluster_key": cluster_key,
+                "adp_id": product["adp_id"],
+                "dataset_url": product["dataset_url"],
+                "lookup": lookup,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return lookup
 
 
 def frontier_model_kappa_url(cluster_key: str, model_family: str) -> str:
@@ -898,7 +1160,9 @@ def build_muse_cluster_proxy_analysis(
     predictor_name: str,
     seed: int,
     permutations: int,
+    match_sep_key: str = "muse_match_sep_arcsec",
     line_count_key: str = "muse_detected_line_count",
+    quality_key: str = "muse_zconf",
 ) -> dict:
     analysis = build_cluster_proxy_analysis(
         cluster_rows=cluster_rows,
@@ -912,13 +1176,13 @@ def build_muse_cluster_proxy_analysis(
         analysis.update(
             {
                 "median_proxy_match_sep_arcsec": float(
-                    np.nanmedian(np.asarray([row["muse_match_sep_arcsec"] for row in proxy_rows], dtype=float))
+                    np.nanmedian(np.asarray([row[match_sep_key] for row in proxy_rows], dtype=float))
                 ),
                 "median_proxy_line_count": float(
                     np.nanmedian(np.asarray([row[line_count_key] for row in proxy_rows], dtype=float))
                 ),
                 "median_proxy_zconf": float(
-                    np.nanmedian(np.asarray([row["muse_zconf"] for row in proxy_rows], dtype=float))
+                    np.nanmedian(np.asarray([row[quality_key] for row in proxy_rows], dtype=float))
                 ),
             }
         )
@@ -955,6 +1219,10 @@ def build_member_subset_analysis(member_rows: list[dict], seed: int, permutation
             "muse_n2_analysis": build_muse_cluster_proxy_analysis([], "muse_n2_proxy", "muse_n2_proxy", seed + 11, permutations),
             "muse_m13_o3n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis([], "muse_m13_o3n2_oxygen_abundance", "muse_m13_o3n2_oxygen_abundance", seed + 12, permutations),
             "muse_m13_n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis([], "muse_m13_n2_oxygen_abundance", "muse_m13_n2_oxygen_abundance", seed + 13, permutations),
+            "muse_deep_o3n2_analysis": build_muse_cluster_proxy_analysis([], "muse_deep_o3n2_proxy", "muse_deep_o3n2_proxy", seed + 14, permutations, match_sep_key="muse_deep_match_sep_arcsec", line_count_key="muse_deep_detected_line_count", quality_key="muse_deep_redshift_quality"),
+            "muse_deep_n2_analysis": build_muse_cluster_proxy_analysis([], "muse_deep_n2_proxy", "muse_deep_n2_proxy", seed + 15, permutations, match_sep_key="muse_deep_match_sep_arcsec", line_count_key="muse_deep_detected_line_count", quality_key="muse_deep_redshift_quality"),
+            "muse_deep_m13_o3n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis([], "muse_deep_m13_o3n2_oxygen_abundance", "muse_deep_m13_o3n2_oxygen_abundance", seed + 16, permutations, match_sep_key="muse_deep_match_sep_arcsec", line_count_key="muse_deep_detected_line_count", quality_key="muse_deep_redshift_quality"),
+            "muse_deep_m13_n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis([], "muse_deep_m13_n2_oxygen_abundance", "muse_deep_m13_n2_oxygen_abundance", seed + 17, permutations, match_sep_key="muse_deep_match_sep_arcsec", line_count_key="muse_deep_detected_line_count", quality_key="muse_deep_redshift_quality"),
         }
 
     subset_score = np.asarray([row["sign_flip_score"] for row in member_rows], dtype=float)
@@ -1036,6 +1304,10 @@ def build_member_subset_analysis(member_rows: list[dict], seed: int, permutation
         "muse_n2_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_n2_proxy", "muse_n2_proxy", seed + 11, permutations),
         "muse_m13_o3n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_m13_o3n2_oxygen_abundance", "muse_m13_o3n2_oxygen_abundance", seed + 12, permutations),
         "muse_m13_n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_m13_n2_oxygen_abundance", "muse_m13_n2_oxygen_abundance", seed + 13, permutations),
+        "muse_deep_o3n2_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_deep_o3n2_proxy", "muse_deep_o3n2_proxy", seed + 14, permutations, match_sep_key="muse_deep_match_sep_arcsec", line_count_key="muse_deep_detected_line_count", quality_key="muse_deep_redshift_quality"),
+        "muse_deep_n2_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_deep_n2_proxy", "muse_deep_n2_proxy", seed + 15, permutations, match_sep_key="muse_deep_match_sep_arcsec", line_count_key="muse_deep_detected_line_count", quality_key="muse_deep_redshift_quality"),
+        "muse_deep_m13_o3n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_deep_m13_o3n2_oxygen_abundance", "muse_deep_m13_o3n2_oxygen_abundance", seed + 16, permutations, match_sep_key="muse_deep_match_sep_arcsec", line_count_key="muse_deep_detected_line_count", quality_key="muse_deep_redshift_quality"),
+        "muse_deep_m13_n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_deep_m13_n2_oxygen_abundance", "muse_deep_m13_n2_oxygen_abundance", seed + 17, permutations, match_sep_key="muse_deep_match_sep_arcsec", line_count_key="muse_deep_detected_line_count", quality_key="muse_deep_redshift_quality"),
     }
 
 
@@ -1732,6 +2004,7 @@ def analyze_hff_cluster_map(
     catalog_path: Path,
     photometric_proxy_lookup: dict[int, dict],
     muse_proxy_lookup: dict[int, dict],
+    muse_deep_proxy_lookup: dict[int, dict],
     deep_spec_lookup: dict[int, dict],
     kappa_path: Path,
     out_dir: Path,
@@ -1827,6 +2100,7 @@ def analyze_hff_cluster_map(
             is_cluster_member = int(cluster_z_min <= zbest <= cluster_z_max)
             photometric_info = photometric_proxy_lookup.get(int(record["IDcat"]), {})
             muse_info = muse_proxy_lookup.get(int(record["IDcat"]), {})
+            muse_deep_info = muse_deep_proxy_lookup.get(int(record["IDcat"]), {})
             deep_spec_info = deep_spec_lookup.get(int(record["IDcat"]), {})
 
             row = {
@@ -1864,6 +2138,14 @@ def analyze_hff_cluster_map(
                 "muse_match_sep_arcsec": muse_info.get("muse_match_sep_arcsec", float("nan")),
                 "muse_redshift": muse_info.get("muse_redshift", float("nan")),
                 "muse_zconf": muse_info.get("muse_zconf", float("nan")),
+                "muse_deep_o3n2_proxy": muse_deep_info.get("muse_deep_o3n2_proxy", float("nan")),
+                "muse_deep_n2_proxy": muse_deep_info.get("muse_deep_n2_proxy", float("nan")),
+                "muse_deep_m13_o3n2_oxygen_abundance": muse_deep_info.get("muse_deep_m13_o3n2_oxygen_abundance", float("nan")),
+                "muse_deep_m13_n2_oxygen_abundance": muse_deep_info.get("muse_deep_m13_n2_oxygen_abundance", float("nan")),
+                "muse_deep_detected_line_count": muse_deep_info.get("muse_deep_detected_line_count", 0),
+                "muse_deep_match_sep_arcsec": muse_deep_info.get("muse_deep_match_sep_arcsec", float("nan")),
+                "muse_deep_redshift": muse_deep_info.get("muse_deep_redshift", float("nan")),
+                "muse_deep_redshift_quality": muse_deep_info.get("muse_deep_redshift_quality", float("nan")),
                 "deep_spec_match_sep_arcsec": deep_spec_info.get("deep_spec_match_sep_arcsec", float("nan")),
                 "deep_spec_redshift": deep_spec_info.get("deep_spec_redshift", float("nan")),
                 "deep_spec_quality": deep_spec_info.get("deep_spec_quality", float("nan")),
@@ -2061,6 +2343,46 @@ def analyze_hff_cluster_map(
         seed=seed + 13,
         permutations=permutations,
     )
+    muse_deep_o3n2_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_deep_o3n2_proxy",
+        predictor_name="muse_deep_o3n2_proxy",
+        seed=seed + 14,
+        permutations=permutations,
+        match_sep_key="muse_deep_match_sep_arcsec",
+        line_count_key="muse_deep_detected_line_count",
+        quality_key="muse_deep_redshift_quality",
+    )
+    muse_deep_n2_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_deep_n2_proxy",
+        predictor_name="muse_deep_n2_proxy",
+        seed=seed + 15,
+        permutations=permutations,
+        match_sep_key="muse_deep_match_sep_arcsec",
+        line_count_key="muse_deep_detected_line_count",
+        quality_key="muse_deep_redshift_quality",
+    )
+    muse_deep_m13_o3n2_oxygen_abundance_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_deep_m13_o3n2_oxygen_abundance",
+        predictor_name="muse_deep_m13_o3n2_oxygen_abundance",
+        seed=seed + 16,
+        permutations=permutations,
+        match_sep_key="muse_deep_match_sep_arcsec",
+        line_count_key="muse_deep_detected_line_count",
+        quality_key="muse_deep_redshift_quality",
+    )
+    muse_deep_m13_n2_oxygen_abundance_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_deep_m13_n2_oxygen_abundance",
+        predictor_name="muse_deep_m13_n2_oxygen_abundance",
+        seed=seed + 17,
+        permutations=permutations,
+        match_sep_key="muse_deep_match_sep_arcsec",
+        line_count_key="muse_deep_detected_line_count",
+        quality_key="muse_deep_redshift_quality",
+    )
 
     cluster_mean_score = float(np.mean(cluster_score))
     deep_spec_cluster_rows = [row for row in cluster_rows if int(row.get("deep_spec_cluster_member", 0)) == 1]
@@ -2150,6 +2472,10 @@ def analyze_hff_cluster_map(
             "muse_n2_analysis": muse_n2_analysis,
             "muse_m13_o3n2_oxygen_abundance_analysis": muse_m13_o3n2_oxygen_abundance_analysis,
             "muse_m13_n2_oxygen_abundance_analysis": muse_m13_n2_oxygen_abundance_analysis,
+            "muse_deep_o3n2_analysis": muse_deep_o3n2_analysis,
+            "muse_deep_n2_analysis": muse_deep_n2_analysis,
+            "muse_deep_m13_o3n2_oxygen_abundance_analysis": muse_deep_m13_o3n2_oxygen_abundance_analysis,
+            "muse_deep_m13_n2_oxygen_abundance_analysis": muse_deep_m13_n2_oxygen_abundance_analysis,
             "deep_spectroscopy_member_analysis": deep_spec_cluster_analysis,
             "random_position_null": {
                 "mean_of_draw_means": random_null["mean_of_draw_means"],
@@ -2231,11 +2557,22 @@ def analyze_hff_cluster_firstpass(
         cluster_z_min=cluster_z_min,
         cluster_z_max=cluster_z_max,
     )
+    muse_deep_proxy_lookup = load_muse_deep_proxy_lookup(
+        cluster_key=cluster_key,
+        catalog_path=catalog_path,
+        deep_spec_lookup=deep_spec_lookup,
+    )
+    muse_deep_proxy_lookup = load_muse_deep_proxy_lookup(
+        cluster_key=cluster_key,
+        catalog_path=catalog_path,
+        deep_spec_lookup=deep_spec_lookup,
+    )
     return analyze_hff_cluster_map(
         cluster_key=cluster_key,
         catalog_path=catalog_path,
         photometric_proxy_lookup=photometric_proxy_lookup,
         muse_proxy_lookup=muse_proxy_lookup,
+        muse_deep_proxy_lookup=muse_deep_proxy_lookup,
         deep_spec_lookup=deep_spec_lookup,
         kappa_path=kappa_path,
         out_dir=out_dir,
@@ -2249,6 +2586,9 @@ def analyze_hff_cluster_firstpass(
             "muse_lines_catalog_url": products[config["muse_lines_key"]],
             "muse_lines_catalog_filename": muse_lines_path.name,
             "muse_catalog_name": "MUSE Lensing Clusters v1.0",
+            "muse_deep_cube_dataset_url": MUSE_DEEP_CORE_PRODUCTS[cluster_key]["dataset_url"],
+            "muse_deep_cube_datalink_url": MUSE_DEEP_CORE_PRODUCTS[cluster_key]["datalink_url"],
+            "muse_deep_cube_collection_name": MUSE_DEEP_CORE_PRODUCTS[cluster_key]["collection_name"],
             "deep_spectroscopy_catalog_url": products[config["deep_spec_key"]],
             "deep_spectroscopy_catalog_filename": deep_spec_path.name,
             "properties_catalog_url": products[config["catalog_key"]],
@@ -2284,6 +2624,10 @@ def summarize_cluster_result(result: dict) -> dict:
     muse_n2 = cluster.get("muse_n2_analysis", {})
     muse_m13_o3n2 = cluster.get("muse_m13_o3n2_oxygen_abundance_analysis", {})
     muse_m13_n2 = cluster.get("muse_m13_n2_oxygen_abundance_analysis", {})
+    muse_deep_o3n2 = cluster.get("muse_deep_o3n2_analysis", {})
+    muse_deep_n2 = cluster.get("muse_deep_n2_analysis", {})
+    muse_deep_m13_o3n2 = cluster.get("muse_deep_m13_o3n2_oxygen_abundance_analysis", {})
+    muse_deep_m13_n2 = cluster.get("muse_deep_m13_n2_oxygen_abundance_analysis", {})
     deep_spec = cluster.get("deep_spectroscopy_member_analysis", {})
     matched = cluster.get("matched_group_effects", {})
     return {
@@ -2398,6 +2742,38 @@ def summarize_cluster_result(result: dict) -> dict:
         "median_muse_m13_n2_oxygen_abundance_match_sep_arcsec": muse_m13_n2.get("median_proxy_match_sep_arcsec", float("nan")),
         "median_muse_m13_n2_oxygen_abundance_line_count": muse_m13_n2.get("median_proxy_line_count", float("nan")),
         "median_muse_m13_n2_oxygen_abundance_zconf": muse_m13_n2.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_deep_o3n2_proxy": muse_deep_o3n2.get("n_cluster_members_with_proxy", 0),
+        "muse_deep_o3n2_partial_correlation": muse_deep_o3n2.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_deep_o3n2_partial_p_value": muse_deep_o3n2.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_deep_o3n2_matched_mean_difference": muse_deep_o3n2.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_deep_o3n2_matched_p_value": muse_deep_o3n2.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_deep_o3n2_match_sep_arcsec": muse_deep_o3n2.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_deep_o3n2_line_count": muse_deep_o3n2.get("median_proxy_line_count", float("nan")),
+        "median_muse_deep_o3n2_zconf": muse_deep_o3n2.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_deep_n2_proxy": muse_deep_n2.get("n_cluster_members_with_proxy", 0),
+        "muse_deep_n2_partial_correlation": muse_deep_n2.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_deep_n2_partial_p_value": muse_deep_n2.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_deep_n2_matched_mean_difference": muse_deep_n2.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_deep_n2_matched_p_value": muse_deep_n2.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_deep_n2_match_sep_arcsec": muse_deep_n2.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_deep_n2_line_count": muse_deep_n2.get("median_proxy_line_count", float("nan")),
+        "median_muse_deep_n2_zconf": muse_deep_n2.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_deep_m13_o3n2_oxygen_abundance": muse_deep_m13_o3n2.get("n_cluster_members_with_proxy", 0),
+        "muse_deep_m13_o3n2_oxygen_abundance_partial_correlation": muse_deep_m13_o3n2.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_deep_m13_o3n2_oxygen_abundance_partial_p_value": muse_deep_m13_o3n2.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_deep_m13_o3n2_oxygen_abundance_matched_mean_difference": muse_deep_m13_o3n2.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_deep_m13_o3n2_oxygen_abundance_matched_p_value": muse_deep_m13_o3n2.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_deep_m13_o3n2_oxygen_abundance_match_sep_arcsec": muse_deep_m13_o3n2.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_deep_m13_o3n2_oxygen_abundance_line_count": muse_deep_m13_o3n2.get("median_proxy_line_count", float("nan")),
+        "median_muse_deep_m13_o3n2_oxygen_abundance_zconf": muse_deep_m13_o3n2.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_deep_m13_n2_oxygen_abundance": muse_deep_m13_n2.get("n_cluster_members_with_proxy", 0),
+        "muse_deep_m13_n2_oxygen_abundance_partial_correlation": muse_deep_m13_n2.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_deep_m13_n2_oxygen_abundance_partial_p_value": muse_deep_m13_n2.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_deep_m13_n2_oxygen_abundance_matched_mean_difference": muse_deep_m13_n2.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_deep_m13_n2_oxygen_abundance_matched_p_value": muse_deep_m13_n2.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_deep_m13_n2_oxygen_abundance_match_sep_arcsec": muse_deep_m13_n2.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_deep_m13_n2_oxygen_abundance_line_count": muse_deep_m13_n2.get("median_proxy_line_count", float("nan")),
+        "median_muse_deep_m13_n2_oxygen_abundance_zconf": muse_deep_m13_n2.get("median_proxy_zconf", float("nan")),
         "n_deep_spec_cluster_members": deep_spec.get("n_members", 0),
         "deep_spec_mean_score": deep_spec.get("mean_score", float("nan")),
         "deep_spec_mass_partial_correlation": deep_spec.get("mass_partial", {}).get("partial_correlation", float("nan")),
@@ -2468,6 +2844,11 @@ def analyze_hff_cluster_model_ensemble(
         cluster_z_min=cluster_z_min,
         cluster_z_max=cluster_z_max,
     )
+    muse_deep_proxy_lookup = load_muse_deep_proxy_lookup(
+        cluster_key=cluster_key,
+        catalog_path=catalog_path,
+        deep_spec_lookup=deep_spec_lookup,
+    )
 
     model_summaries = []
     run_counter = 0
@@ -2493,6 +2874,7 @@ def analyze_hff_cluster_model_ensemble(
             catalog_path=catalog_path,
             photometric_proxy_lookup=photometric_proxy_lookup,
             muse_proxy_lookup=muse_proxy_lookup,
+            muse_deep_proxy_lookup=muse_deep_proxy_lookup,
             deep_spec_lookup=deep_spec_lookup,
             kappa_path=kappa_path,
             out_dir=out_dir,
@@ -2506,6 +2888,9 @@ def analyze_hff_cluster_model_ensemble(
                 "muse_lines_catalog_url": products[config["muse_lines_key"]],
                 "muse_lines_catalog_filename": muse_lines_path.name,
                 "muse_catalog_name": "MUSE Lensing Clusters v1.0",
+                "muse_deep_cube_dataset_url": MUSE_DEEP_CORE_PRODUCTS[cluster_key]["dataset_url"],
+                "muse_deep_cube_datalink_url": MUSE_DEEP_CORE_PRODUCTS[cluster_key]["datalink_url"],
+                "muse_deep_cube_collection_name": MUSE_DEEP_CORE_PRODUCTS[cluster_key]["collection_name"],
                 "deep_spectroscopy_catalog_url": products[config["deep_spec_key"]],
                 "deep_spectroscopy_catalog_filename": deep_spec_path.name,
                 "properties_catalog_url": products[config["catalog_key"]],

@@ -25,6 +25,7 @@ combined_firstpass_ratio_gated_bandpass/
 combined_firstpass_spectroscopic_ratios_bandpass/
 combined_firstpass_metallicity_bandpass/
 combined_firstpass_strongline_metallicity_bandpass/
+combined_firstpass_muse_deep_core_extraction/
 robustness_sweep/
 robustness_sweep_muse_bandpass/
 robustness_sweep_muse_spectroscopic_bandpass/
@@ -32,6 +33,7 @@ robustness_sweep_ratio_gated_bandpass/
 robustness_sweep_spectroscopic_ratios_bandpass/
 robustness_sweep_metallicity_bandpass/
 robustness_sweep_strongline_metallicity_bandpass/
+robustness_sweep_muse_deep_core_extraction/
 full_experiment/
 full_experiment_proxy/
 full_experiment_buffalo/
@@ -43,6 +45,7 @@ full_experiment_spectroscopic_ratios_bandpass/
 full_experiment_deep_spec_bandpass/
 full_experiment_metallicity_bandpass/
 full_experiment_strongline_metallicity_bandpass/
+full_experiment_muse_deep_core_extraction/
 proxy_catalog_inspect/
 tmp_inputs/
 
