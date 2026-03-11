@@ -106,11 +106,12 @@ This has been verified computationally across 4 activation functions, 4 metering
 The effective potential $V_{\text{eff}}(x) = 1/N(x)^2$ confines temporal oscillations:
 
 - $V_{\text{eff}} \to \infty$ as $\mu \to 0$ (the potential is confining)
-- The spectrum is purely discrete (only bound states exist)
+- The abstract theorem spine proves a WKB-style barrier under the stated decay and positivity hypotheses
+- In the representative lattice and continuum truncations studied here, the temporal spectrum is discrete and bound-state dominated
 - In the representative WKB estimate used here, the tunneling probability is numerically negligible: $\exp(-3218)$
-- The metered region supports a finite number of bound states: ~69 radial modes (1+1D), ~600 modes (1000-site continuum), ~17 bits (3+1D with angular modes)
+- The representative numerical mode counts are: ~69 radial modes (1+1D), ~600 modes (1000-site continuum), ~17 bits (3+1D with angular modes)
 
-The temporal Hilbert space is finite-dimensional and bounded by the metering geometry.
+These finite counts are numerical results for the tested truncations and dimensional models. A continuum finite-dimensionality theorem remains open.
 
 ### Theorem 3: Proper Time Vanishing
 
@@ -118,9 +119,9 @@ For a static observer at position $x$:
 
 $$\tau(x, T) = N(x) \cdot T \to 0 \quad \text{as} \quad \mu(x) \to 0$$
 
-For a worldline passing through a region where $\mu = 0$ on an interval $[t_1, t_2]$, the proper time contribution from that interval is exactly zero.
+In the current formal development, if a prescribed path $\gamma(t)$ lies entirely in a meterless region on an interval $[t_1, t_2]$, then the lapse integral over that interval is exactly zero.
 
-**Duration requires a meter.**
+This is the present theorem-level scope. Extending it to a full dynamical statement for general worldlines is a separate derivation.
 
 ### Formal Verification
 
@@ -377,16 +378,16 @@ In this model, that sharpness is a consequence of the phase-transition-like beha
 
 ### Differential Gravitational Lensing
 
-The Ricci scalar $R(x)$ changes sign at the metering boundary:
+In the reduced 1+1D metering geometry, the Ricci scalar $R(x)$ changes sign at the metering boundary:
 
 - **Inside the metered region:** $R > 0$ (convergent lensing)
 - **At the boundary:** $R < 0$ (divergent lensing)
 
-This **convergence-divergence sign flip** is a unique morphological signature. Dark matter subhalos produce convergence only. Modified gravity (f(R), MOND) alters amplitude but not the sign pattern. The metering boundary's sign-flip pattern is structurally distinct.
+This convergence-divergence sign flip is the structural clue carried forward from the reduced model. It is not yet, by itself, the 3+1D photon observable.
 
-**Observational target:** Galaxy cluster lensing residuals. Test direct metallicity and other decoherence-relevant proxies against stellar mass and local convergence under explicit controls. A proxy that carries conditional signal beyond those baseline axes, while preserving the predicted convergence-plus-divergence morphology, would constitute evidence.
+The current 3+1D null-geodesic workbench [`three_plus_one_lensing.py`](./three_plus_one_lensing.py) makes the immediate theoretical constraint explicit. Under the mass-term-only photon-decoupling model used in this repository, photons follow the bare metric: the flat decoupled control gives zero direct deflection and zero direct gravitational redshift to numerical precision, while the Schwarzschild control reproduces the weak-field $4M/b$ law at the sub-percent level. A direct metering-induced photon signal therefore requires either an explicit photon-sector completion or a backreaction calculation that feeds the massive-sector metering structure into the metric photons inhabit.
 
-This analysis requires no new observations. HST, JWST, and Chandra archival data suffice.
+**Observational target:** Galaxy cluster lensing residuals. The archival program tests whether the sign-flip-like morphology survives model-family variation and whether any decoherence-relevant proxy carries conditional signal beyond stellar mass and local convergence. That is a morphology-and-confounder program, not yet a completed derivation of a direct photon-sector effect.
 
 The current archival program works on the two public HFF cluster fields (`Abell 370`, `RXC J2248 / Abell S1063`) using the official HFF property catalogs, BUFFALO v2 photometric proxy catalogs, public MUSE Lensing Clusters spectroscopic catalogs, a hardened `radial_median_bandpass` residual construction, deeper external spectroscopy for membership hardening, public `MUSE-DEEP` core-cube extractions, and 22 independent frontier-model `kappa` maps. The sign-flip-like morphology is reproducible across model families, so the observational question is no longer whether the morphology exists in the archive; it is which explanatory axis survives the controls and replicates across clusters.
 
@@ -424,10 +425,10 @@ The effective lapse function at early times (low metering density) differs from 
 
 ### D. Geometric Observer Detection
 
-If metering density modifies spacetime geometry, regions containing observers have measurably different physical properties:
+If a consistent 3+1D completion yields a nontrivial photon observable, regions containing observers could imprint measurably different physical properties:
 
-- **Anomalous gravitational lensing:** A metered region lenses light differently than an equivalent-mass region without metering subsystems, due to the curvature modification.
-- **Redshift anomaly:** The lapse function is a gravitational redshift factor. Photons from metered regions carry a metering-dependent frequency shift.
+- **Anomalous gravitational lensing:** a metered region could lens light differently than an equal-mass control once the photon sector or backreaction is specified.
+- **Redshift anomaly:** a metering-dependent frequency shift would have to be derived in the metric photons actually inhabit.
 - **Thermal halo:** The analog Unruh temperature at the metering boundary peaks at a characteristic value set by the metering gradient.
 - **Correlation signature:** A true metering signal shows correlated anomalies across all three channels (lensing, redshift, thermal). False positives from unrelated astrophysics do not produce this correlation.
 
@@ -452,6 +453,8 @@ Within that program, the hardened residual baseline is now in place, stronger pu
 ### 3+1D Lensing Observable
 
 The project now needs the actual lensing observable derived from a consistent 3+1D completion, not further proxy reshuffling on the current public archive. The central task is to write the covariant theory cleanly enough that photon propagation, lensing, and any claimed redshift effect can be computed from the field equations rather than inferred from lower-dimensional geometric intuition.
+
+A concrete workbench for that step now exists in [`three_plus_one_lensing.py`](./three_plus_one_lensing.py). It evaluates null geodesics for static spherical photon metrics, checks the flat-decoupled control, and benchmarks against Schwarzschild. At present that workbench says something sharp: flat photon decoupling yields no direct metering-induced photon deflection or redshift. The next theoretical move is therefore not proxy reshuffling; it is to specify the photon sector or the backreaction channel tightly enough that a nontrivial 3+1D observable can be computed.
 
 ### The Coupling Constant
 
@@ -537,6 +540,7 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Potential shape discrimination | 6-site hardware comparison complete; $1/N^2$ gives the best fit among tested shapes |
 | Metering field equation (PDE + stability) | Numerical study complete; stable in the tested setups |
 | Photon decoupling | Model consequence of the mass-term-only coupling |
+| 3+1D lensing observable | Null-geodesic workbench in place; flat photon decoupling gives zero direct photon signal; photon-sector/backreaction completion open |
 | Decoherence rate source criterion | Proposed and computationally explored; not observationally established |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
 | Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; the public-data proxy lane is exhausted without a replicated abundance-style signal; active focus shifts to the 3+1D lensing derivation |
