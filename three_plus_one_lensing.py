@@ -26,6 +26,7 @@ from typing import Callable
 
 import numpy as np
 from scipy.integrate import IntegrationWarning, cumulative_trapezoid, quad
+from scipy.ndimage import gaussian_filter, label, map_coordinates
 
 
 MetricFn = Callable[[float], float]
@@ -791,10 +792,8 @@ def build_axisymmetric_lensing_map(
     ys = np.linspace(-extent, extent, grid_size)
     x_grid, y_grid = np.meshgrid(xs, ys)
     radius_grid = np.sqrt(x_grid * x_grid + y_grid * y_grid)
-    max_impact = float(impacts[-1])
-    clipped_radius = np.clip(radius_grid, impacts[0], max_impact)
-    kappa_grid = np.interp(clipped_radius, impacts, convergence)
-    gamma_t_grid = np.interp(clipped_radius, impacts, shear_tangential)
+    kappa_grid = interpolate_radial_field(impacts, convergence, radius_grid)
+    gamma_t_grid = interpolate_radial_field(impacts, shear_tangential, radius_grid)
     threshold = max(1.0e-12, 1.0e-4 * float(np.max(np.abs(convergence))))
     kappa_resolved = np.where(np.abs(kappa_grid) >= threshold, kappa_grid, 0.0)
     phi_grid = np.arctan2(y_grid, x_grid)
@@ -819,6 +818,352 @@ def build_axisymmetric_lensing_map(
                 "kappa_map": kappa_grid.tolist(),
                 "gamma1_map": gamma1_grid.tolist(),
                 "gamma2_map": gamma2_grid.tolist(),
+            }
+        )
+    return result
+
+
+def build_radius_map(
+    shape: tuple[int, int],
+    center_x: float,
+    center_y: float,
+    pixel_scale: float,
+) -> np.ndarray:
+    yy, xx = np.indices(shape, dtype=float)
+    x_coords = (xx - (shape[1] - 1) / 2.0) * pixel_scale
+    y_coords = (yy - (shape[0] - 1) / 2.0) * pixel_scale
+    return np.sqrt((x_coords - center_x) ** 2 + (y_coords - center_y) ** 2)
+
+
+def gaussian_smooth_masked(image: np.ndarray, footprint: np.ndarray, sigma_px: float) -> np.ndarray:
+    finite_mask = footprint & np.isfinite(image)
+    if not np.any(finite_mask):
+        raise ValueError("Masked Gaussian smoothing requires at least one finite pixel.")
+    values = np.where(finite_mask, image, 0.0)
+    weights = np.where(finite_mask, 1.0, 0.0)
+    smooth_values = gaussian_filter(values, sigma=sigma_px)
+    smooth_weights = gaussian_filter(weights, sigma=sigma_px)
+    smooth = np.full(image.shape, np.nan, dtype=float)
+    valid = smooth_weights > 1.0e-6
+    smooth[valid] = smooth_values[valid] / smooth_weights[valid]
+    smooth[~footprint] = np.nan
+    return smooth
+
+
+def build_residual_map(
+    field: np.ndarray,
+    footprint: np.ndarray,
+    center_x: float,
+    center_y: float,
+    pixel_scale: float,
+    radial_bin_width: float,
+    smooth_sigma_px: float,
+) -> tuple[np.ndarray, dict]:
+    radius_map = build_radius_map(
+        shape=field.shape,
+        center_x=center_x,
+        center_y=center_y,
+        pixel_scale=pixel_scale,
+    )
+    finite_mask = footprint & np.isfinite(field) & np.isfinite(radius_map)
+    if not np.any(finite_mask):
+        raise ValueError("No finite pixels available for radial-median subtraction.")
+
+    max_radius = float(np.max(radius_map[finite_mask]))
+    bin_edges = np.arange(0.0, max_radius + radial_bin_width, radial_bin_width)
+    if bin_edges.size < 2:
+        bin_edges = np.array([0.0, max_radius + radial_bin_width], dtype=float)
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+    radial_medians = np.full(bin_centers.shape, np.nan, dtype=float)
+
+    for index in range(bin_centers.size):
+        in_bin = finite_mask & (radius_map >= bin_edges[index]) & (radius_map < bin_edges[index + 1])
+        if np.any(in_bin):
+            radial_medians[index] = float(np.median(field[in_bin]))
+
+    valid = np.isfinite(radial_medians)
+    if np.count_nonzero(valid) < 2:
+        raise ValueError("Radial-median subtraction did not find enough populated bins.")
+
+    baseline = np.interp(
+        radius_map,
+        bin_centers[valid],
+        radial_medians[valid],
+        left=float(radial_medians[valid][0]),
+        right=float(radial_medians[valid][-1]),
+    )
+    radial_residual = field - baseline
+    radial_residual[~footprint] = np.nan
+    local_background = gaussian_smooth_masked(radial_residual, footprint, sigma_px=smooth_sigma_px)
+    residual = radial_residual - local_background
+    residual[~footprint] = np.nan
+    return residual, {
+        "radial_bin_width": float(radial_bin_width),
+        "radial_bin_count": int(bin_centers.size),
+        "populated_radial_bin_count": int(np.count_nonzero(valid)),
+        "smooth_sigma_px": float(smooth_sigma_px),
+    }
+
+
+def interpolate_radial_field(impacts: np.ndarray, values: np.ndarray, radius: np.ndarray) -> np.ndarray:
+    return np.interp(
+        radius,
+        impacts,
+        values,
+        left=float(values[0]),
+        right=0.0,
+    )
+
+
+def component_weight(spec: dict) -> float:
+    return float(spec.get("weight", spec.get("amplitude_scale", 1.0)))
+
+
+def component_centroid(specs: list[dict]) -> tuple[float, float]:
+    total_weight = max(sum(component_weight(spec) for spec in specs), 1.0e-12)
+    center_x = sum(component_weight(spec) * float(spec["center_x"]) for spec in specs) / total_weight
+    center_y = sum(component_weight(spec) * float(spec["center_y"]) for spec in specs) / total_weight
+    return float(center_x), float(center_y)
+
+
+def component_principal_axis_deg(specs: list[dict]) -> float:
+    center_x, center_y = component_centroid(specs)
+    total_weight = max(sum(component_weight(spec) for spec in specs), 1.0e-12)
+    covariance = np.zeros((2, 2), dtype=float)
+    for spec in specs:
+        dx = float(spec["center_x"]) - center_x
+        dy = float(spec["center_y"]) - center_y
+        weight = component_weight(spec)
+        displacement = np.array([[dx], [dy]], dtype=float)
+        covariance += weight * (displacement @ displacement.T)
+    covariance /= total_weight
+    eigenvalues, eigenvectors = np.linalg.eigh(covariance)
+    major_axis = eigenvectors[:, int(np.argmax(eigenvalues))]
+    angle = math.degrees(math.atan2(float(major_axis[1]), float(major_axis[0])))
+    return float(angle)
+
+
+def residual_angular_harmonics(
+    residual_map: np.ndarray,
+    extent: float,
+    center_x: float,
+    center_y: float,
+    max_order: int = 4,
+) -> dict[str, float]:
+    grid_size = residual_map.shape[0]
+    pixel_scale = (2.0 * extent) / max(grid_size - 1, 1)
+    yy, xx = np.indices(residual_map.shape, dtype=float)
+    x_coords = (xx - (residual_map.shape[1] - 1) / 2.0) * pixel_scale - center_x
+    y_coords = (yy - (residual_map.shape[0] - 1) / 2.0) * pixel_scale - center_y
+    theta = np.arctan2(y_coords, x_coords)
+    resolved_threshold = max(1.0e-12, 1.0e-4 * float(np.nanmax(np.abs(residual_map))))
+    resolved = np.where(np.abs(residual_map) >= resolved_threshold, residual_map, 0.0)
+    norm = float(np.sum(np.abs(resolved)))
+    if norm <= 0.0:
+        return {f"m{order}": 0.0 for order in range(1, max_order + 1)}
+
+    harmonics: dict[str, float] = {}
+    for order in range(1, max_order + 1):
+        cosine = float(np.sum(resolved * np.cos(order * theta)) / norm)
+        sine = float(np.sum(resolved * np.sin(order * theta)) / norm)
+        harmonics[f"m{order}"] = float(math.sqrt(cosine * cosine + sine * sine))
+    return harmonics
+
+
+def count_connected_regions(mask: np.ndarray) -> int:
+    structure = np.ones((3, 3), dtype=int)
+    _, count = label(mask, structure=structure)
+    return int(count)
+
+
+def sample_field_along_axis(
+    field: np.ndarray,
+    extent: float,
+    center_x: float,
+    center_y: float,
+    axis_angle_deg: float,
+    radial_extent: float,
+    samples: int,
+) -> dict:
+    if samples < 5:
+        raise ValueError("samples must be at least 5.")
+    offsets = np.linspace(-radial_extent, radial_extent, samples)
+    angle = math.radians(axis_angle_deg)
+    x_coords = center_x + offsets * math.cos(angle)
+    y_coords = center_y + offsets * math.sin(angle)
+    pixel_scale = (2.0 * extent) / max(field.shape[1] - 1, 1)
+    x_index = (x_coords + extent) / pixel_scale
+    y_index = (y_coords + extent) / pixel_scale
+    samples_values = map_coordinates(field, [y_index, x_index], order=1, mode="nearest")
+    threshold = max(1.0e-12, 1.0e-4 * float(np.nanmax(np.abs(field))))
+    resolved = np.where(np.abs(samples_values) >= threshold, samples_values, 0.0)
+    sign_changes = np.where(np.signbit(resolved[:-1]) != np.signbit(resolved[1:]))[0]
+    sign_flip_positions = [float(0.5 * (offsets[idx] + offsets[idx + 1])) for idx in sign_changes]
+    return {
+        "axis_angle_deg": float(axis_angle_deg),
+        "offsets": offsets.tolist(),
+        "values": samples_values.tolist(),
+        "resolved_zero_threshold": threshold,
+        "sign_flip_positions": sign_flip_positions,
+    }
+
+
+def composite_component_specs(scenario: str, separation: float, subcluster_ratio: float) -> list[dict]:
+    half = 0.5 * separation
+    if scenario == "single_center":
+        return [
+            {"name": "core", "center_x": 0.0, "center_y": 0.0, "amplitude_scale": 1.0, "weight": 1.0},
+        ]
+    if scenario == "binary_equal":
+        return [
+            {"name": "west", "center_x": -half, "center_y": 0.0, "amplitude_scale": 1.0, "weight": 1.0},
+            {"name": "east", "center_x": half, "center_y": 0.0, "amplitude_scale": 1.0, "weight": 1.0},
+        ]
+    if scenario == "bullet_offset":
+        return [
+            {"name": "main", "center_x": -0.25 * separation, "center_y": 0.0, "amplitude_scale": 1.0, "weight": 1.0},
+            {
+                "name": "subcluster",
+                "center_x": 0.75 * separation,
+                "center_y": 0.18 * separation,
+                "amplitude_scale": subcluster_ratio,
+                "sigma_scale": 0.75,
+                "core_scale": 0.7,
+                "scale_radius_scale": 0.7,
+                "weight": subcluster_ratio,
+            },
+        ]
+    if scenario == "triple_asymmetric":
+        return [
+            {"name": "core", "center_x": 0.0, "center_y": 0.0, "amplitude_scale": 1.0, "weight": 1.0},
+            {
+                "name": "northwest",
+                "center_x": -0.7 * separation,
+                "center_y": 0.45 * separation,
+                "amplitude_scale": 0.55,
+                "sigma_scale": 0.8,
+                "core_scale": 0.8,
+                "scale_radius_scale": 0.75,
+                "weight": 0.55,
+            },
+            {
+                "name": "southeast",
+                "center_x": 0.9 * separation,
+                "center_y": -0.35 * separation,
+                "amplitude_scale": 0.4,
+                "sigma_scale": 0.65,
+                "core_scale": 0.6,
+                "scale_radius_scale": 0.65,
+                "weight": 0.4,
+            },
+        ]
+    raise ValueError(f"Unknown scenario: {scenario}")
+
+
+def build_multicomponent_lensing_map(
+    component_payloads: list[dict],
+    extent: float,
+    grid_size: int,
+    radial_bin_width: float,
+    smooth_sigma_px: float,
+    axis_samples: int,
+    include_arrays: bool,
+) -> dict:
+    if grid_size < 5:
+        raise ValueError("grid_size must be at least 5.")
+    xs = np.linspace(-extent, extent, grid_size)
+    ys = np.linspace(-extent, extent, grid_size)
+    x_grid, y_grid = np.meshgrid(xs, ys)
+    kappa_total = np.zeros_like(x_grid)
+    gamma1_total = np.zeros_like(x_grid)
+    gamma2_total = np.zeros_like(x_grid)
+
+    for payload in component_payloads:
+        radial_profile = payload["radial_profile"]
+        impacts = np.asarray(radial_profile["impact_parameters"], dtype=float)
+        convergence = np.asarray(radial_profile["convergence"], dtype=float)
+        shear_tangential = np.asarray(radial_profile["shear_tangential"], dtype=float)
+        dx = x_grid - float(payload["spec"]["center_x"])
+        dy = y_grid - float(payload["spec"]["center_y"])
+        radius = np.sqrt(dx * dx + dy * dy)
+        kappa_local = interpolate_radial_field(impacts, convergence, radius)
+        gamma_t_local = interpolate_radial_field(impacts, shear_tangential, radius)
+        phi = np.arctan2(dy, dx)
+        gamma1_local = -gamma_t_local * np.cos(2.0 * phi)
+        gamma2_local = -gamma_t_local * np.sin(2.0 * phi)
+        kappa_total += kappa_local
+        gamma1_total += gamma1_local
+        gamma2_total += gamma2_local
+
+    gamma_t_total = np.sqrt(gamma1_total * gamma1_total + gamma2_total * gamma2_total)
+    footprint = np.isfinite(kappa_total)
+    pixel_scale = (2.0 * extent) / max(grid_size - 1, 1)
+    center_x, center_y = component_centroid([payload["spec"] for payload in component_payloads])
+    residual_map, residual_metadata = build_residual_map(
+        field=kappa_total,
+        footprint=footprint,
+        center_x=center_x,
+        center_y=center_y,
+        pixel_scale=pixel_scale,
+        radial_bin_width=radial_bin_width,
+        smooth_sigma_px=smooth_sigma_px,
+    )
+    threshold = max(1.0e-12, 1.0e-4 * float(np.max(np.abs(kappa_total))))
+    kappa_resolved = np.where(np.abs(kappa_total) >= threshold, kappa_total, 0.0)
+    residual_threshold = max(1.0e-12, 1.0e-4 * float(np.nanmax(np.abs(residual_map))))
+    residual_resolved = np.where(np.abs(residual_map) >= residual_threshold, residual_map, 0.0)
+    axis_angle_deg = component_principal_axis_deg([payload["spec"] for payload in component_payloads])
+    axis_profile = sample_field_along_axis(
+        field=residual_map,
+        extent=extent,
+        center_x=center_x,
+        center_y=center_y,
+        axis_angle_deg=axis_angle_deg,
+        radial_extent=extent,
+        samples=axis_samples,
+    )
+    angular_harmonics = residual_angular_harmonics(
+        residual_map=residual_map,
+        extent=extent,
+        center_x=center_x,
+        center_y=center_y,
+    )
+    positive_regions = count_connected_regions(residual_resolved > 0.0)
+    negative_regions = count_connected_regions(residual_resolved < 0.0)
+
+    result = {
+        "extent": float(extent),
+        "grid_size": int(grid_size),
+        "component_centroid": {"x": center_x, "y": center_y},
+        "principal_axis_angle_deg": axis_angle_deg,
+        "kappa_min": float(np.min(kappa_total)),
+        "kappa_max": float(np.max(kappa_total)),
+        "gamma_t_max": float(np.max(gamma_t_total)),
+        "negative_kappa_fraction": float(np.mean(kappa_total < 0.0)),
+        "negative_kappa_fraction_resolved": float(np.mean(kappa_resolved < 0.0)),
+        "residual_min": float(np.nanmin(residual_map)),
+        "residual_max": float(np.nanmax(residual_map)),
+        "negative_residual_fraction": float(np.mean(residual_map < 0.0)),
+        "negative_residual_fraction_resolved": float(np.mean(residual_resolved < 0.0)),
+        "positive_residual_fraction_resolved": float(np.mean(residual_resolved > 0.0)),
+        "residual_sign_flip_positions": axis_profile["sign_flip_positions"],
+        "residual_axis_profile": axis_profile,
+        "residual_angular_harmonics": angular_harmonics,
+        "positive_resolved_region_count": positive_regions,
+        "negative_resolved_region_count": negative_regions,
+        "residual_map_metadata": residual_metadata,
+        "resolved_zero_threshold": threshold,
+        "resolved_residual_zero_threshold": residual_threshold,
+    }
+    if include_arrays:
+        result.update(
+            {
+                "x_coordinates": xs.tolist(),
+                "y_coordinates": ys.tolist(),
+                "kappa_map": kappa_total.tolist(),
+                "gamma1_map": gamma1_total.tolist(),
+                "gamma2_map": gamma2_total.tolist(),
+                "residual_map": residual_map.tolist(),
             }
         )
     return result
@@ -1191,6 +1536,66 @@ def command_cluster_map(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def command_cluster_composite_map(args: argparse.Namespace) -> None:
+    component_specs = composite_component_specs(
+        scenario=args.scenario,
+        separation=args.separation,
+        subcluster_ratio=args.subcluster_ratio,
+    )
+    component_payloads = []
+    for spec in component_specs:
+        profile = solve_screened_poisson_cluster_profile(
+            source_kind=args.source_kind,
+            source_amplitude=args.source_amplitude * float(spec.get("amplitude_scale", 1.0)),
+            source_sigma=args.source_sigma * float(spec.get("sigma_scale", 1.0)),
+            source_core_radius=args.source_core_radius * float(spec.get("core_scale", 1.0)),
+            source_scale_radius=args.source_scale_radius * float(spec.get("scale_radius_scale", 1.0)),
+            source_beta=args.source_beta,
+            source_outer_slope=args.source_outer_slope,
+            screening_mass=args.screening_mass,
+            profile_r_max=args.profile_r_max,
+            profile_samples=args.profile_samples,
+        )
+        metric = einstein_scalar_backreaction_metric_from_profile(
+            profile=profile,
+            density_scale=args.density_scale,
+            gravity_scale=args.gravity_scale,
+            exterior_match_tolerance=args.exterior_match_tolerance,
+        )
+        radial_profile = sample_axisymmetric_lensing_profile(
+            metric,
+            impact_min=args.impact_min,
+            impact_max=args.impact_max,
+            samples=args.radial_samples,
+            r_max=args.r_max,
+        )
+        component_payloads.append(
+            {
+                "spec": spec,
+                "source_profile": profile.metadata,
+                "metric_metadata": metric.metadata,
+                "radial_profile": radial_profile,
+            }
+        )
+
+    map_payload = build_multicomponent_lensing_map(
+        component_payloads=component_payloads,
+        extent=args.map_extent,
+        grid_size=args.grid_size,
+        radial_bin_width=args.radial_bin_width,
+        smooth_sigma_px=args.smooth_sigma_px,
+        axis_samples=args.axis_samples,
+        include_arrays=args.include_map_arrays,
+    )
+    result = {
+        "scenario": f"composite_einstein_map:{args.scenario}",
+        "source_kind": args.source_kind,
+        "components": component_payloads,
+        "map": map_payload,
+    }
+    print(json.dumps(result, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Evaluate 3+1D photon observables for static spherical metrics.",
@@ -1295,6 +1700,42 @@ def build_parser() -> argparse.ArgumentParser:
     cluster_map.add_argument("--grid-size", type=int, default=65)
     cluster_map.add_argument("--include-map-arrays", action="store_true")
     cluster_map.set_defaults(func=command_cluster_map)
+
+    composite_map = subparsers.add_parser(
+        "cluster-composite-map",
+        help="Build multi-component Einstein-branch residual maps for non-spherical cluster geometries.",
+    )
+    composite_map.add_argument(
+        "--scenario",
+        choices=["single_center", "binary_equal", "bullet_offset", "triple_asymmetric"],
+        default="bullet_offset",
+    )
+    composite_map.add_argument("--separation", type=float, default=850.0)
+    composite_map.add_argument("--subcluster-ratio", type=float, default=0.45)
+    composite_map.add_argument("--source-kind", choices=["gaussian", "beta_model", "softened_nfw"], default="softened_nfw")
+    composite_map.add_argument("--source-amplitude", type=float, default=1.0e-3)
+    composite_map.add_argument("--source-sigma", type=float, default=120.0)
+    composite_map.add_argument("--source-core-radius", type=float, default=60.0)
+    composite_map.add_argument("--source-scale-radius", type=float, default=350.0)
+    composite_map.add_argument("--source-beta", type=float, default=0.8)
+    composite_map.add_argument("--source-outer-slope", type=float, default=3.0)
+    composite_map.add_argument("--screening-mass", type=float, default=0.01)
+    composite_map.add_argument("--density-scale", type=float, default=1.0e-6)
+    composite_map.add_argument("--gravity-scale", type=float, default=1.0)
+    composite_map.add_argument("--exterior-match-tolerance", type=float, default=1.0e-6)
+    composite_map.add_argument("--profile-r-max", type=float, default=8.0e3)
+    composite_map.add_argument("--profile-samples", type=int, default=4096)
+    composite_map.add_argument("--impact-min", type=float, default=30.0)
+    composite_map.add_argument("--impact-max", type=float, default=4.0e3)
+    composite_map.add_argument("--radial-samples", type=int, default=64)
+    composite_map.add_argument("--r-max", type=float, default=8.0e4)
+    composite_map.add_argument("--map-extent", type=float, default=4.0e3)
+    composite_map.add_argument("--grid-size", type=int, default=129)
+    composite_map.add_argument("--radial-bin-width", type=float, default=120.0)
+    composite_map.add_argument("--smooth-sigma-px", type=float, default=3.0)
+    composite_map.add_argument("--axis-samples", type=int, default=257)
+    composite_map.add_argument("--include-map-arrays", action="store_true")
+    composite_map.set_defaults(func=command_cluster_composite_map)
 
     return parser
 
