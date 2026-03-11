@@ -20,11 +20,12 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import warnings
 from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-from scipy.integrate import cumulative_trapezoid, quad
+from scipy.integrate import IntegrationWarning, cumulative_trapezoid, quad
 
 
 MetricFn = Callable[[float], float]
@@ -40,12 +41,86 @@ class StaticSphericalPhotonMetric:
     metadata: dict[str, float] | None = None
 
 
+@dataclass(frozen=True)
+class SphericalMeteringProfile:
+    radii: np.ndarray
+    source: np.ndarray
+    mu: np.ndarray
+    mu_prime: np.ndarray
+    screening_mass: float
+    metadata: dict[str, float]
+
+
 def tanh_lapse(mu: float, alpha: float, epsilon: float = 0.0) -> float:
     return float(epsilon + (1.0 - epsilon) * math.tanh(alpha * mu))
 
 
 def gaussian_mu(r: float, mu0: float, sigma: float) -> float:
     return float(mu0 * math.exp(-(r * r) / (2.0 * sigma * sigma)))
+
+
+def gaussian_source(r: np.ndarray, amplitude: float, sigma: float) -> np.ndarray:
+    return amplitude * np.exp(-(r * r) / (2.0 * sigma * sigma))
+
+
+def reverse_cumulative_trapezoid(values: np.ndarray, grid: np.ndarray) -> np.ndarray:
+    result = np.zeros_like(values)
+    if values.size > 1:
+        shell_steps = 0.5 * (values[1:] + values[:-1]) * np.diff(grid)
+        result[:-1] = np.cumsum(shell_steps[::-1])[::-1]
+    return result
+
+
+def solve_screened_poisson_profile(
+    source_amplitude: float,
+    source_sigma: float,
+    screening_mass: float,
+    profile_r_max: float,
+    profile_samples: int,
+) -> SphericalMeteringProfile:
+    if profile_samples < 5:
+        raise ValueError("profile_samples must be at least 5.")
+
+    radii = np.linspace(0.0, profile_r_max, profile_samples, dtype=float)
+    step = float(radii[1] - radii[0])
+    source = gaussian_source(radii, amplitude=source_amplitude, sigma=source_sigma)
+
+    interior_radii = radii[1:-1]
+    interior_count = interior_radii.size
+    diagonal = np.full(interior_count, (-2.0 / (step * step)) - (screening_mass * screening_mass), dtype=float)
+    off_diagonal = np.full(interior_count - 1, 1.0 / (step * step), dtype=float)
+    operator = np.diag(diagonal) + np.diag(off_diagonal, 1) + np.diag(off_diagonal, -1)
+    rhs = -interior_radii * source[1:-1]
+
+    u = np.zeros_like(radii)
+    u[1:-1] = np.linalg.solve(operator, rhs)
+
+    safe_radii = np.maximum(radii, 1.0e-12)
+    mu = np.zeros_like(radii)
+    mu[1:] = u[1:] / safe_radii[1:]
+    mu[0] = mu[1]
+    mu_prime = np.gradient(mu, step, edge_order=2)
+    radial_laplacian = np.gradient(mu_prime, step, edge_order=2)
+    radial_laplacian[1:] += 2.0 * mu_prime[1:] / safe_radii[1:]
+    radial_laplacian[0] = radial_laplacian[1]
+    residual = radial_laplacian - (screening_mass * screening_mass * mu) + source
+
+    return SphericalMeteringProfile(
+        radii=radii,
+        source=source,
+        mu=mu,
+        mu_prime=mu_prime,
+        screening_mass=screening_mass,
+        metadata={
+            "source_amplitude": float(source_amplitude),
+            "source_sigma": float(source_sigma),
+            "profile_r_max": float(profile_r_max),
+            "profile_samples": float(profile_samples),
+            "max_mu": float(np.max(mu)),
+            "max_source": float(np.max(source)),
+            "max_field_equation_residual": float(np.max(np.abs(residual))),
+        },
+    )
 
 
 def flat_decoupled_metric() -> StaticSphericalPhotonMetric:
@@ -188,6 +263,131 @@ def toy_backreacted_metering_metric(
     )
 
 
+def metering_stress_energy(
+    profile: SphericalMeteringProfile,
+    density_scale: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    potential = 0.5 * profile.screening_mass * profile.screening_mass * profile.mu * profile.mu
+    kinetic = 0.5 * profile.mu_prime * profile.mu_prime
+    rho = density_scale * (kinetic + potential)
+    radial_pressure = density_scale * (kinetic - potential)
+    tangential_pressure = density_scale * (-kinetic - potential)
+    return rho, radial_pressure, tangential_pressure
+
+
+def einstein_scalar_backreaction_metric(
+    source_amplitude: float,
+    source_sigma: float,
+    screening_mass: float,
+    density_scale: float,
+    gravity_scale: float,
+    profile_r_max: float,
+    profile_samples: int,
+) -> StaticSphericalPhotonMetric:
+    profile = solve_screened_poisson_profile(
+        source_amplitude=source_amplitude,
+        source_sigma=source_sigma,
+        screening_mass=screening_mass,
+        profile_r_max=profile_r_max,
+        profile_samples=profile_samples,
+    )
+    radii = profile.radii
+    safe_radii = np.maximum(radii, 1.0e-8)
+    rho, radial_pressure, _ = metering_stress_energy(profile, density_scale=density_scale)
+    source_density = 4.0 * math.pi * gravity_scale * radii * radii * rho
+    mass_function = cumulative_trapezoid(source_density, radii, initial=0.0)
+    compactness = 2.0 * mass_function / safe_radii
+    compactness[0] = 0.0
+    denominator = np.maximum(safe_radii * np.maximum(safe_radii - 2.0 * mass_function, 1.0e-10), 1.0e-10)
+    phi_prime = (mass_function + 4.0 * math.pi * gravity_scale * radii * radii * radii * radial_pressure) / denominator
+    phi_prime[0] = 0.0
+    phi = -reverse_cumulative_trapezoid(phi_prime, radii)
+    phi -= phi[-1]
+
+    lapse_values = np.maximum(np.exp(2.0 * phi), 1.0e-8)
+    radial_values = 1.0 / np.maximum(1.0 - compactness, 1.0e-8)
+    radial_values[0] = radial_values[1]
+
+    r_min = max(float(radii[1]), 1.0e-6)
+
+    def lapse_A(r: float) -> float:
+        return float(np.interp(r, radii, lapse_values, left=lapse_values[1], right=1.0))
+
+    def radial_B(r: float) -> float:
+        return float(np.interp(r, radii, radial_values, left=radial_values[1], right=1.0))
+
+    metadata = dict(profile.metadata)
+    metadata.update(
+        {
+            "density_scale": float(density_scale),
+            "gravity_scale": float(gravity_scale),
+            "max_energy_density": float(np.max(rho)),
+            "max_radial_pressure": float(np.max(radial_pressure)),
+            "max_compactness_2GM_over_r": float(np.max(compactness)),
+            "minimum_photon_lapse": float(np.min(np.sqrt(lapse_values))),
+            "gravity_scaled_mass": float(mass_function[-1]),
+        }
+    )
+    return StaticSphericalPhotonMetric(
+        name="einstein_scalar_backreaction",
+        lapse_A=lapse_A,
+        radial_B=radial_B,
+        r_min=r_min,
+        asymptotic_lapse=1.0,
+        metadata=metadata,
+    )
+
+
+def photon_disformal_metering_metric(
+    source_amplitude: float,
+    source_sigma: float,
+    screening_mass: float,
+    temporal_coupling: float,
+    radial_coupling: float,
+    photon_alpha: float,
+    profile_r_max: float,
+    profile_samples: int,
+) -> StaticSphericalPhotonMetric:
+    profile = solve_screened_poisson_profile(
+        source_amplitude=source_amplitude,
+        source_sigma=source_sigma,
+        screening_mass=screening_mass,
+        profile_r_max=profile_r_max,
+        profile_samples=profile_samples,
+    )
+    radii = profile.radii
+    activation = np.tanh(photon_alpha * profile.mu)
+    lapse_values = np.maximum(1.0 - temporal_coupling * activation * activation, 1.0e-8)
+    radial_values = np.maximum(1.0 + radial_coupling * profile.mu_prime * profile.mu_prime, 1.0e-8)
+    r_min = max(float(radii[1]), 1.0e-6)
+
+    def lapse_A(r: float) -> float:
+        return float(np.interp(r, radii, lapse_values, left=lapse_values[1], right=1.0))
+
+    def radial_B(r: float) -> float:
+        return float(np.interp(r, radii, radial_values, left=radial_values[1], right=1.0))
+
+    metadata = dict(profile.metadata)
+    metadata.update(
+        {
+            "temporal_coupling": float(temporal_coupling),
+            "radial_coupling": float(radial_coupling),
+            "photon_alpha": float(photon_alpha),
+            "max_activation": float(np.max(activation * activation)),
+            "minimum_photon_lapse": float(np.min(np.sqrt(lapse_values))),
+            "maximum_photon_radial_factor": float(np.max(radial_values)),
+        }
+    )
+    return StaticSphericalPhotonMetric(
+        name="photon_disformal_metering",
+        lapse_A=lapse_A,
+        radial_B=radial_B,
+        r_min=r_min,
+        asymptotic_lapse=1.0,
+        metadata=metadata,
+    )
+
+
 def radial_potential(metric: StaticSphericalPhotonMetric, r: float, impact_parameter: float) -> float:
     return (1.0 / metric.lapse_A(r)) - (impact_parameter * impact_parameter) / (r * r)
 
@@ -258,29 +458,49 @@ def coordinate_time_integrand(metric: StaticSphericalPhotonMetric, r: float, imp
     return math.sqrt(metric.radial_B(r)) / (metric.lapse_A(r) * math.sqrt(potential))
 
 
+def integrate_from_turning_point(
+    integrand: Callable[[float], float],
+    turning_radius: float,
+    upper_radius: float,
+) -> tuple[float, float]:
+    if upper_radius <= turning_radius:
+        raise ValueError("upper_radius must exceed turning_radius.")
+    upper_y = math.sqrt(upper_radius - turning_radius)
+
+    def transformed(y: float) -> float:
+        sample_y = max(y, 1.0e-12)
+        radius = turning_radius + sample_y * sample_y
+        return 2.0 * sample_y * integrand(radius)
+
+    lower_y = min(1.0e-8, upper_y * 1.0e-8)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", IntegrationWarning)
+        return quad(
+            transformed,
+            lower_y,
+            upper_y,
+            limit=400,
+            epsabs=1.0e-10,
+            epsrel=1.0e-10,
+        )
+
+
 def photon_deflection_angle(
     metric: StaticSphericalPhotonMetric,
     impact_parameter: float,
     r_max: float,
 ) -> dict:
     turning_radius = find_turning_radius(metric, impact_parameter=impact_parameter, r_max=r_max)
-    metric_integral, metric_error = quad(
+    metric_integral, metric_error = integrate_from_turning_point(
         lambda r: deflection_integrand(metric, r, impact_parameter),
-        turning_radius,
-        r_max,
-        points=[turning_radius],
-        limit=400,
-        epsabs=1.0e-10,
-        epsrel=1.0e-10,
+        turning_radius=turning_radius,
+        upper_radius=r_max,
     )
-    flat_integral, flat_error = quad(
+    flat_integral, flat_error = integrate_from_turning_point(
         lambda r: deflection_integrand(flat_decoupled_metric(), r, impact_parameter),
-        impact_parameter,
-        r_max,
-        points=[impact_parameter],
-        limit=400,
-        epsabs=1.0e-10,
-        epsrel=1.0e-10,
+        turning_radius=impact_parameter,
+        upper_radius=r_max,
     )
     angle = 2.0 * (metric_integral - flat_integral)
     return {
@@ -297,23 +517,15 @@ def photon_coordinate_time(
     r_observer: float,
 ) -> dict:
     turning_radius = find_turning_radius(metric, impact_parameter=impact_parameter, r_max=r_observer)
-    metric_time, metric_error = quad(
+    metric_time, metric_error = integrate_from_turning_point(
         lambda r: coordinate_time_integrand(metric, r, impact_parameter),
-        turning_radius,
-        r_observer,
-        points=[turning_radius],
-        limit=400,
-        epsabs=1.0e-10,
-        epsrel=1.0e-10,
+        turning_radius=turning_radius,
+        upper_radius=r_observer,
     )
-    flat_time, flat_error = quad(
+    flat_time, flat_error = integrate_from_turning_point(
         lambda r: coordinate_time_integrand(flat_decoupled_metric(), r, impact_parameter),
-        impact_parameter,
-        r_observer,
-        points=[impact_parameter],
-        limit=400,
-        epsabs=1.0e-10,
-        epsrel=1.0e-10,
+        turning_radius=impact_parameter,
+        upper_radius=r_observer,
     )
     return {
         "turning_radius": turning_radius,
@@ -353,6 +565,27 @@ def scenario_metric(args: argparse.Namespace) -> StaticSphericalPhotonMetric:
         return flat_decoupled_metric()
     if args.scenario == "schwarzschild":
         return schwarzschild_metric(mass=args.mass)
+    if args.scenario == "einstein_scalar_backreaction":
+        return einstein_scalar_backreaction_metric(
+            source_amplitude=args.source_amplitude,
+            source_sigma=args.source_sigma,
+            screening_mass=args.screening_mass,
+            density_scale=args.density_scale,
+            gravity_scale=args.gravity_scale,
+            profile_r_max=args.profile_r_max,
+            profile_samples=args.profile_samples,
+        )
+    if args.scenario == "photon_disformal_metering":
+        return photon_disformal_metering_metric(
+            source_amplitude=args.source_amplitude,
+            source_sigma=args.source_sigma,
+            screening_mass=args.screening_mass,
+            temporal_coupling=args.temporal_coupling,
+            radial_coupling=args.radial_coupling,
+            photon_alpha=args.photon_alpha,
+            profile_r_max=args.profile_r_max,
+            profile_samples=args.profile_samples,
+        )
     if args.scenario == "toy_backreacted_metering":
         return toy_backreacted_metering_metric(
             mu0=args.mu0,
@@ -399,6 +632,48 @@ def command_benchmark(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def command_compare_completions(args: argparse.Namespace) -> None:
+    flat_metric = flat_decoupled_metric()
+    einstein_metric = einstein_scalar_backreaction_metric(
+        source_amplitude=args.source_amplitude,
+        source_sigma=args.source_sigma,
+        screening_mass=args.screening_mass,
+        density_scale=args.density_scale,
+        gravity_scale=args.gravity_scale,
+        profile_r_max=args.profile_r_max,
+        profile_samples=args.profile_samples,
+    )
+    photon_metric = photon_disformal_metering_metric(
+        source_amplitude=args.source_amplitude,
+        source_sigma=args.source_sigma,
+        screening_mass=args.screening_mass,
+        temporal_coupling=args.temporal_coupling,
+        radial_coupling=args.radial_coupling,
+        photon_alpha=args.photon_alpha,
+        profile_r_max=args.profile_r_max,
+        profile_samples=args.profile_samples,
+    )
+    metrics = [flat_metric, einstein_metric, photon_metric]
+    result = {
+        "impact_parameter": args.impact_parameter,
+        "r_max": args.r_max,
+        "r_emit": args.r_emit,
+        "r_obs": args.r_obs,
+        "metrics": [],
+    }
+    for metric in metrics:
+        payload = {
+            "scenario": metric.name,
+            "deflection": photon_deflection_angle(metric, impact_parameter=args.impact_parameter, r_max=args.r_max),
+            "coordinate_time": photon_coordinate_time(metric, impact_parameter=args.impact_parameter, r_observer=args.r_max),
+            "redshift": static_observer_redshift(metric, r_emit=args.r_emit, r_obs=args.r_obs),
+        }
+        if metric.metadata is not None:
+            payload["metric_metadata"] = metric.metadata
+        result["metrics"].append(payload)
+    print(json.dumps(result, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Evaluate 3+1D photon observables for static spherical metrics.",
@@ -408,7 +683,14 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate = subparsers.add_parser("evaluate", help="Evaluate deflection, time delay, and redshift for a metric.")
     evaluate.add_argument(
         "--scenario",
-        choices=["flat_decoupled", "schwarzschild", "toy_photon_coupled_metering", "toy_backreacted_metering"],
+        choices=[
+            "flat_decoupled",
+            "schwarzschild",
+            "toy_photon_coupled_metering",
+            "toy_backreacted_metering",
+            "einstein_scalar_backreaction",
+            "photon_disformal_metering",
+        ],
         required=True,
     )
     evaluate.add_argument("--impact-parameter", type=float, default=50.0)
@@ -420,9 +702,14 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--sigma", type=float, default=100.0)
     evaluate.add_argument("--alpha", type=float, default=5.0)
     evaluate.add_argument("--epsilon", type=float, default=0.05)
+    evaluate.add_argument("--source-amplitude", type=float, default=1.0e-3)
+    evaluate.add_argument("--source-sigma", type=float, default=120.0)
     evaluate.add_argument("--screening-mass", type=float, default=0.05)
     evaluate.add_argument("--density-scale", type=float, default=1.0e-6)
     evaluate.add_argument("--gravity-scale", type=float, default=1.0)
+    evaluate.add_argument("--temporal-coupling", type=float, default=0.02)
+    evaluate.add_argument("--radial-coupling", type=float, default=0.1)
+    evaluate.add_argument("--photon-alpha", type=float, default=1.0)
     evaluate.add_argument("--profile-r-max", type=float, default=2.0e3)
     evaluate.add_argument("--profile-samples", type=int, default=4096)
     evaluate.set_defaults(func=command_evaluate)
@@ -432,6 +719,23 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--impact-parameter", type=float, default=1000.0)
     benchmark.add_argument("--r-max", type=float, default=1.0e6)
     benchmark.set_defaults(func=command_benchmark)
+
+    compare = subparsers.add_parser("compare-completions", help="Compare flat, Einstein-backreacted, and explicit photon-coupled branches.")
+    compare.add_argument("--impact-parameter", type=float, default=50.0)
+    compare.add_argument("--r-max", type=float, default=5.0e4)
+    compare.add_argument("--r-emit", type=float, default=10.0)
+    compare.add_argument("--r-obs", type=float, default=1.0e6)
+    compare.add_argument("--source-amplitude", type=float, default=1.0e-3)
+    compare.add_argument("--source-sigma", type=float, default=120.0)
+    compare.add_argument("--screening-mass", type=float, default=0.05)
+    compare.add_argument("--density-scale", type=float, default=1.0e-6)
+    compare.add_argument("--gravity-scale", type=float, default=1.0)
+    compare.add_argument("--temporal-coupling", type=float, default=0.02)
+    compare.add_argument("--radial-coupling", type=float, default=0.1)
+    compare.add_argument("--photon-alpha", type=float, default=1.0)
+    compare.add_argument("--profile-r-max", type=float, default=2.0e3)
+    compare.add_argument("--profile-samples", type=int, default=4096)
+    compare.set_defaults(func=command_compare_completions)
 
     return parser
 
