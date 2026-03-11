@@ -21,6 +21,7 @@ import argparse
 import csv
 import json
 import math
+import re
 import xml.etree.ElementTree as ET
 from collections import Counter
 from dataclasses import dataclass, asdict
@@ -66,6 +67,7 @@ OFFICIAL_PRODUCTS = {
         "hff_cats_v4_kappa": "https://archive.stsci.edu/pub/hlsp/frontier/abell370/models/cats/v4/hlsp_frontier_model_abell370_cats_v4_kappa.fits",
         "muse_redshift_catalog": "https://cral-perso.univ-lyon1.fr/labo/perso/johan.richard/MUSE_data_release/catalogs/A370_v1.0.fits",
         "muse_lines_catalog": "https://cral-perso.univ-lyon1.fr/labo/perso/johan.richard/MUSE_data_release/catalogs/A370_v1.0_lines.fits",
+        "deep_spectroscopy_catalog": "https://astro.dur.ac.uk/~hbpn39/pilotWINGS/A370_PilotWINGS_data_catalog.fits",
     },
     "rxcj2248": {
         "buffalo_proxy_catalog": "https://archive.stsci.edu/hlsps/buffalo/abells1063/catalogs/pagul-v2.0/hlsp_buffalo_hst_ir-weighted_abells1063_multi_v2.0_catalog.fits",
@@ -73,6 +75,7 @@ OFFICIAL_PRODUCTS = {
         "hff_cats_v4.1_kappa": "https://archive.stsci.edu/pub/hlsp/frontier/abells1063/models/cats/v4.1/hlsp_frontier_model_abells1063_cats_v4.1_kappa.fits",
         "muse_redshift_catalog": "https://cral-perso.univ-lyon1.fr/labo/perso/johan.richard/MUSE_data_release/catalogs/AS1063_v1.0.fits",
         "muse_lines_catalog": "https://cral-perso.univ-lyon1.fr/labo/perso/johan.richard/MUSE_data_release/catalogs/AS1063_v1.0_lines.fits",
+        "deep_spectroscopy_catalog": "https://drive.google.com/uc?export=download&id=1b_b7mFXk26UUaOsVF0qustI5C4U68Xhz",
     },
 }
 
@@ -89,6 +92,8 @@ HFF_CLUSTER_CONFIG = {
         "muse_redshift_filename": "abell370_muse_redshift.fits",
         "muse_lines_key": "muse_lines_catalog",
         "muse_lines_filename": "abell370_muse_lines.fits",
+        "deep_spec_key": "deep_spectroscopy_catalog",
+        "deep_spec_filename": "abell370_pilotwings_catalog.fits",
         "label": "Abell 370",
         "default_z_window": (0.35, 0.45),
     },
@@ -104,6 +109,8 @@ HFF_CLUSTER_CONFIG = {
         "muse_redshift_filename": "as1063_muse_redshift.fits",
         "muse_lines_key": "muse_lines_catalog",
         "muse_lines_filename": "as1063_muse_lines.fits",
+        "deep_spec_key": "deep_spectroscopy_catalog",
+        "deep_spec_filename": "as1063_clashvlt_zcat.dat",
         "label": "RXC J2248 / Abell S1063",
         "default_z_window": (0.35, 0.45),
     },
@@ -158,6 +165,9 @@ BUFFALO_PROXY_MIN_SNR = 2.0
 MUSE_PROXY_MATCH_MAX_ARCSEC = 0.3
 MUSE_PROXY_MIN_SNR = 3.0
 MUSE_PROXY_MIN_ZCONF = 2.0
+PROXY_ANALYSIS_MIN_SAMPLE = 20
+DEEP_SPEC_MATCH_MAX_ARCSEC = 0.3
+DEEP_SPEC_MIN_QUALITY = 2.0
 MUSE_EMISSION_LINES = {
     "OII3727",
     "OII3729",
@@ -167,23 +177,91 @@ MUSE_EMISSION_LINES = {
     "HGAMMA",
     "HDELTA",
     "HALPHA",
-    "NEIII3869",
+    "NEIII3870",
     "NEIII3967",
-    "HeI5877",
-    "HeI3890",
+    "HEI5877",
+    "HEI3890",
+    "NII6550",
+    "NII6585",
+    "SII6718",
+    "SII6733",
+    "OI6302",
 }
 MUSE_OPTICAL_PROXY_LINES = MUSE_EMISSION_LINES | {
-    "CaK",
-    "CaH",
-    "CaG",
-    "MgB",
-    "NaD",
+    "CAK",
+    "CAH",
+    "CAG",
+    "MGB",
+    "NAD",
     "H8",
     "H9",
     "H10",
     "H11",
     "HEPSILON",
 }
+MUSE_OII_LINES = ("OII3727", "OII3729")
+MUSE_OIII_LINES = ("OIII4960", "OIII5008")
+MARINO2013_O3N2_RANGE = (-1.1, 1.7)
+MARINO2013_N2_RANGE = (-1.6, -0.2)
+
+
+def normalize_muse_line_name(name: str) -> str:
+    return name.strip().upper()
+
+
+def muse_detected_flux_map(muse_line_rows: list[object]) -> dict[str, float]:
+    flux_map: dict[str, float] = {}
+    best_snr: dict[str, float] = {}
+    for line_row in muse_line_rows:
+        line_name = normalize_muse_line_name(str(line_row["LINE"]))
+        snr = float(line_row["SNR"])
+        flux = float(line_row["FLUX"])
+        if not np.isfinite(snr) or snr < MUSE_PROXY_MIN_SNR:
+            continue
+        if not np.isfinite(flux) or flux <= 0.0:
+            continue
+        if line_name not in best_snr or snr > best_snr[line_name]:
+            flux_map[line_name] = flux
+            best_snr[line_name] = snr
+    return flux_map
+
+
+def muse_sum_flux(line_flux_map: dict[str, float], line_names: Iterable[str]) -> float:
+    fluxes = [line_flux_map[name] for name in line_names if name in line_flux_map]
+    if not fluxes:
+        return float("nan")
+    return float(np.sum(np.asarray(fluxes, dtype=float)))
+
+
+def muse_log10_ratio(numerator: float, denominator: float) -> float:
+    if not np.isfinite(numerator) or not np.isfinite(denominator):
+        return float("nan")
+    if numerator <= 0.0 or denominator <= 0.0:
+        return float("nan")
+    return float(math.log10(numerator / denominator))
+
+
+def marino2013_o3n2_oxygen_abundance(o3n2: float) -> float:
+    if not np.isfinite(o3n2):
+        return float("nan")
+    if not (MARINO2013_O3N2_RANGE[0] <= o3n2 <= MARINO2013_O3N2_RANGE[1]):
+        return float("nan")
+    return float(8.533 - 0.214 * o3n2)
+
+
+def marino2013_n2_oxygen_abundance(n2: float) -> float:
+    if not np.isfinite(n2):
+        return float("nan")
+    if not (MARINO2013_N2_RANGE[0] <= n2 <= MARINO2013_N2_RANGE[1]):
+        return float("nan")
+    return float(8.743 + 0.462 * n2)
+
+
+def nanmedian_or_nan(values: Iterable[float]) -> float:
+    array = np.asarray(list(values), dtype=float)
+    if not np.any(np.isfinite(array)):
+        return float("nan")
+    return float(np.nanmedian(array))
 
 CLI_EPILOG = """Examples:
   python lensing.py manifest --out lensing_manifest.json
@@ -506,8 +584,9 @@ def muse_line_proxy_values(muse_line_rows: list[object]) -> dict[str, float | in
     emission_line_count = 0
     optical_complexity = 0.0
     emission_strength = 0.0
+    line_flux_map = muse_detected_flux_map(muse_line_rows)
     for line_row in muse_line_rows:
-        line_name = str(line_row["LINE"])
+        line_name = normalize_muse_line_name(str(line_row["LINE"]))
         snr = float(line_row["SNR"])
         if not np.isfinite(snr) or snr < MUSE_PROXY_MIN_SNR:
             continue
@@ -515,14 +594,29 @@ def muse_line_proxy_values(muse_line_rows: list[object]) -> dict[str, float | in
             line_count += 1
             optical_complexity += abs(snr)
         if line_name in MUSE_EMISSION_LINES:
-            flux = float(line_row["FLUX"])
+            flux = line_flux_map.get(line_name, float("nan"))
             if np.isfinite(flux) and flux > 0.0:
                 emission_line_count += 1
                 emission_strength += flux
+    oii_flux = muse_sum_flux(line_flux_map, MUSE_OII_LINES)
+    oiii_flux = muse_sum_flux(line_flux_map, MUSE_OIII_LINES)
+    hbeta_flux = muse_sum_flux(line_flux_map, ("HBETA",))
+    halpha_flux = muse_sum_flux(line_flux_map, ("HALPHA",))
+    nii6585_flux = muse_sum_flux(line_flux_map, ("NII6585",))
+    oiii5008_flux = muse_sum_flux(line_flux_map, ("OIII5008",))
+    n2_ratio = muse_log10_ratio(nii6585_flux, halpha_flux)
+    o3n2_ratio = muse_log10_ratio(oiii5008_flux * halpha_flux, hbeta_flux * nii6585_flux)
     return {
         "muse_line_count_proxy": float(line_count),
         "muse_emission_strength_proxy": float(math.log10(1.0 + emission_strength)),
         "muse_optical_complexity_proxy": float(math.log10(1.0 + optical_complexity)),
+        "muse_r23_proxy": muse_log10_ratio(oii_flux + oiii_flux, hbeta_flux),
+        "muse_o32_proxy": muse_log10_ratio(oiii_flux, oii_flux),
+        "muse_o3n2_proxy": o3n2_ratio,
+        "muse_n2_proxy": n2_ratio,
+        "muse_balmer_decrement_proxy": muse_log10_ratio(halpha_flux, hbeta_flux),
+        "muse_m13_o3n2_oxygen_abundance": marino2013_o3n2_oxygen_abundance(o3n2_ratio),
+        "muse_m13_n2_oxygen_abundance": marino2013_n2_oxygen_abundance(n2_ratio),
         "muse_detected_line_count": int(line_count),
         "muse_detected_emission_line_count": int(emission_line_count),
     }
@@ -584,6 +678,106 @@ def load_muse_proxy_lookup(
     return lookup
 
 
+def parse_clash_vlt_rows(path: Path) -> list[dict[str, float | str]]:
+    pattern = re.compile(
+        r"^(?P<object_id>.+?)\s+"
+        r"(?P<ra>[-+]?\d+\.\d+)\s+"
+        r"(?P<dec>[-+]?\d+\.\d+)\s+"
+        r"(?P<z>[-+]?\d+\.\d+)\s+"
+        r"(?P<quality>\d+)\s+"
+        r"(?P<reference>\d+)\s+"
+        r"(?P<r_mag>[-+]?\d+\.\d+)\s*$"
+    )
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line or line.startswith("#"):
+            continue
+        match = pattern.match(line)
+        if match is None:
+            continue
+        rows.append(
+            {
+                "object_id": match.group("object_id").strip(),
+                "ra": float(match.group("ra")),
+                "dec": float(match.group("dec")),
+                "z": float(match.group("z")),
+                "quality": float(match.group("quality")),
+                "reference": float(match.group("reference")),
+                "r_mag": float(match.group("r_mag")),
+            }
+        )
+    return rows
+
+
+def load_deep_spectroscopy_lookup(
+    cluster_key: str,
+    catalog_path: Path,
+    deep_spec_path: Path,
+    cluster_z_min: float,
+    cluster_z_max: float,
+) -> dict[int, dict]:
+    with fits.open(catalog_path) as hdul:
+        hff_rows = hdul[1].data
+        hff_coords = SkyCoord(
+            ra=np.asarray(hff_rows["alpha_j2000"], dtype=float) * u.deg,
+            dec=np.asarray(hff_rows["delta_j2000"], dtype=float) * u.deg,
+        )
+
+    if cluster_key == "abell370":
+        with fits.open(deep_spec_path) as hdul:
+            deep_rows = hdul[1].data
+            deep_ra = np.asarray(deep_rows["RA"], dtype=float)
+            deep_dec = np.asarray(deep_rows["DEC"], dtype=float)
+        deep_catalog_rows = [
+            {
+                "catalog_id": str(record["iden"]).strip(),
+                "ra": float(record["RA"]),
+                "dec": float(record["DEC"]),
+                "z": float(record["z"]),
+                "quality": float(record["zconf"]),
+                "field": str(record["Field"]).strip(),
+                "source_kind": str(record["idfrom"]).strip(),
+            }
+            for record in deep_rows
+        ]
+        catalog_name = "Pilot-WINGS"
+    elif cluster_key == "rxcj2248":
+        deep_catalog_rows = parse_clash_vlt_rows(deep_spec_path)
+        deep_ra = np.asarray([row["ra"] for row in deep_catalog_rows], dtype=float)
+        deep_dec = np.asarray([row["dec"] for row in deep_catalog_rows], dtype=float)
+        catalog_name = "CLASH-VLT"
+    else:
+        raise ValueError(f"Unsupported deep spectroscopy cluster key: {cluster_key}")
+
+    deep_coords = SkyCoord(ra=deep_ra * u.deg, dec=deep_dec * u.deg)
+    nearest_idx, nearest_sep, _ = hff_coords.match_to_catalog_sky(deep_coords)
+    reverse_hff_idx, _, _ = deep_coords.match_to_catalog_sky(hff_coords)
+
+    lookup = {}
+    for row_index, record in enumerate(hff_rows):
+        deep_index = int(nearest_idx[row_index])
+        match_sep_arcsec = float(nearest_sep[row_index].arcsec)
+        if reverse_hff_idx[deep_index] != row_index or match_sep_arcsec > DEEP_SPEC_MATCH_MAX_ARCSEC:
+            continue
+        deep_row = deep_catalog_rows[deep_index]
+        deep_z = float(deep_row["z"])
+        deep_quality = float(deep_row["quality"])
+        if not np.isfinite(deep_z) or not np.isfinite(deep_quality):
+            continue
+        lookup[int(record["IDcat"])] = {
+            "deep_spec_match_sep_arcsec": match_sep_arcsec,
+            "deep_spec_redshift": deep_z,
+            "deep_spec_quality": deep_quality,
+            "deep_spec_secure": int(deep_quality >= DEEP_SPEC_MIN_QUALITY),
+            "deep_spec_cluster_member": int(
+                deep_quality >= DEEP_SPEC_MIN_QUALITY and cluster_z_min <= deep_z <= cluster_z_max
+            ),
+            "deep_spec_catalog_name": catalog_name,
+            "deep_spec_catalog_id": deep_row["catalog_id"] if "catalog_id" in deep_row else deep_row["object_id"],
+        }
+    return lookup
+
+
 def build_cluster_proxy_analysis(
     cluster_rows: list[dict],
     proxy_key: str,
@@ -592,9 +786,11 @@ def build_cluster_proxy_analysis(
     permutations: int,
 ) -> dict:
     proxy_cluster_rows = [row for row in cluster_rows if np.isfinite(float(row[proxy_key]))]
-    if not proxy_cluster_rows:
+    if len(proxy_cluster_rows) < PROXY_ANALYSIS_MIN_SAMPLE:
         return {
-            "n_cluster_members_with_proxy": 0,
+            "n_cluster_members_with_proxy": len(proxy_cluster_rows),
+            "minimum_required_sample": PROXY_ANALYSIS_MIN_SAMPLE,
+            "insufficient_sample": True,
             "mean_proxy": float("nan"),
             "std_proxy": float("nan"),
             "high_proxy_threshold": float("nan"),
@@ -680,6 +876,8 @@ def build_cluster_proxy_analysis(
     high_proxy_mask = proxy_cluster >= proxy_threshold
     return {
         "n_cluster_members_with_proxy": len(proxy_cluster_rows),
+        "minimum_required_sample": PROXY_ANALYSIS_MIN_SAMPLE,
+        "insufficient_sample": False,
         "mean_proxy": float(np.mean(proxy_cluster)),
         "std_proxy": float(np.std(proxy_cluster)),
         "high_proxy_threshold": proxy_threshold,
@@ -691,6 +889,153 @@ def build_cluster_proxy_analysis(
         "proxy_partial": proxy_partial,
         "matched_high_vs_low": proxy_matched,
         "spearman": {"proxy_vs_score": float(spearmanr(proxy_cluster, proxy_cluster_score).statistic)},
+    }
+
+
+def build_muse_cluster_proxy_analysis(
+    cluster_rows: list[dict],
+    proxy_key: str,
+    predictor_name: str,
+    seed: int,
+    permutations: int,
+    line_count_key: str = "muse_detected_line_count",
+) -> dict:
+    analysis = build_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key=proxy_key,
+        predictor_name=predictor_name,
+        seed=seed,
+        permutations=permutations,
+    )
+    proxy_rows = [row for row in cluster_rows if np.isfinite(float(row[proxy_key]))]
+    if proxy_rows:
+        analysis.update(
+            {
+                "median_proxy_match_sep_arcsec": float(
+                    np.nanmedian(np.asarray([row["muse_match_sep_arcsec"] for row in proxy_rows], dtype=float))
+                ),
+                "median_proxy_line_count": float(
+                    np.nanmedian(np.asarray([row[line_count_key] for row in proxy_rows], dtype=float))
+                ),
+                "median_proxy_zconf": float(
+                    np.nanmedian(np.asarray([row["muse_zconf"] for row in proxy_rows], dtype=float))
+                ),
+            }
+        )
+    else:
+        analysis.update(
+            {
+                "median_proxy_match_sep_arcsec": float("nan"),
+                "median_proxy_line_count": float("nan"),
+                "median_proxy_zconf": float("nan"),
+            }
+        )
+    return analysis
+
+
+def build_member_subset_analysis(member_rows: list[dict], seed: int, permutations: int) -> dict:
+    if not member_rows:
+        return {
+            "n_members": 0,
+            "mean_score": float("nan"),
+            "pass_rate": float("nan"),
+            "regression": {},
+            "mass_partial": {"partial_correlation": float("nan"), "permutation_p_value": float("nan"), "permutations": permutations},
+            "sfr_partial": {"partial_correlation": float("nan"), "permutation_p_value": float("nan"), "permutations": permutations},
+            "local_kappa_partial": {"partial_correlation": float("nan"), "permutation_p_value": float("nan"), "permutations": permutations},
+            "matched_group_effects": {},
+            "photometric_proxy_analysis": build_cluster_proxy_analysis([], "photometric_proxy", "photometric_proxy", seed + 3, permutations),
+            "muse_line_count_analysis": build_muse_cluster_proxy_analysis([], "muse_line_count_proxy", "muse_line_count_proxy", seed + 4, permutations),
+            "muse_emission_strength_analysis": build_muse_cluster_proxy_analysis([], "muse_emission_strength_proxy", "muse_emission_strength_proxy", seed + 5, permutations, line_count_key="muse_detected_emission_line_count"),
+            "muse_optical_complexity_analysis": build_muse_cluster_proxy_analysis([], "muse_optical_complexity_proxy", "muse_optical_complexity_proxy", seed + 6, permutations),
+            "muse_r23_analysis": build_muse_cluster_proxy_analysis([], "muse_r23_proxy", "muse_r23_proxy", seed + 7, permutations),
+            "muse_o32_analysis": build_muse_cluster_proxy_analysis([], "muse_o32_proxy", "muse_o32_proxy", seed + 8, permutations),
+            "muse_o3n2_analysis": build_muse_cluster_proxy_analysis([], "muse_o3n2_proxy", "muse_o3n2_proxy", seed + 9, permutations),
+            "muse_balmer_decrement_analysis": build_muse_cluster_proxy_analysis([], "muse_balmer_decrement_proxy", "muse_balmer_decrement_proxy", seed + 10, permutations),
+            "muse_n2_analysis": build_muse_cluster_proxy_analysis([], "muse_n2_proxy", "muse_n2_proxy", seed + 11, permutations),
+            "muse_m13_o3n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis([], "muse_m13_o3n2_oxygen_abundance", "muse_m13_o3n2_oxygen_abundance", seed + 12, permutations),
+            "muse_m13_n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis([], "muse_m13_n2_oxygen_abundance", "muse_m13_n2_oxygen_abundance", seed + 13, permutations),
+        }
+
+    subset_score = np.asarray([row["sign_flip_score"] for row in member_rows], dtype=float)
+    subset_mass = np.asarray([row["mass_neb"] for row in member_rows], dtype=float)
+    subset_sfr = np.asarray([row["sfr_neb"] for row in member_rows], dtype=float)
+    subset_zbest = np.asarray([row["zbest"] for row in member_rows], dtype=float)
+    subset_logmagnif = np.log10(np.maximum(np.asarray([row["magnif"] for row in member_rows], dtype=float), 1e-6))
+    subset_radius = np.asarray([row["cluster_radius_arcsec"] for row in member_rows], dtype=float)
+    subset_local_kappa = np.asarray([row["local_kappa"] for row in member_rows], dtype=float)
+
+    subset_regression = fit_linear_model(
+        np.column_stack([subset_mass, subset_sfr, subset_zbest, subset_logmagnif, subset_radius, subset_local_kappa]),
+        subset_score,
+        ["mass_neb", "sfr_neb", "zbest", "log10_magnif", "cluster_radius_arcsec", "local_kappa"],
+    )
+
+    controls_for_mass = np.column_stack([subset_sfr, subset_zbest, subset_logmagnif, subset_radius, subset_local_kappa])
+    controls_for_sfr = np.column_stack([subset_mass, subset_zbest, subset_logmagnif, subset_radius, subset_local_kappa])
+    controls_for_local_kappa = np.column_stack([subset_mass, subset_sfr, subset_zbest, subset_logmagnif, subset_radius])
+    matched_group_effects = {
+        "mass_high_vs_low": matched_group_difference(
+            predictor=subset_mass,
+            response=subset_score,
+            controls=controls_for_mass,
+            seed=seed + 20,
+            permutations=permutations,
+        ),
+        "sfr_high_vs_low": matched_group_difference(
+            predictor=subset_sfr,
+            response=subset_score,
+            controls=controls_for_sfr,
+            seed=seed + 21,
+            permutations=permutations,
+        ),
+        "local_kappa_high_vs_low": matched_group_difference(
+            predictor=subset_local_kappa,
+            response=subset_score,
+            controls=controls_for_local_kappa,
+            seed=seed + 22,
+            permutations=permutations,
+        ),
+    }
+
+    return {
+        "n_members": len(member_rows),
+        "mean_score": float(np.mean(subset_score)),
+        "pass_rate": float(np.mean(np.asarray([row["sign_flip_pass"] for row in member_rows], dtype=float))),
+        "regression": subset_regression,
+        "mass_partial": partial_correlation_and_permutation_pvalue(
+            predictor=subset_mass,
+            response=subset_score,
+            controls=controls_for_mass,
+            seed=seed,
+            permutations=permutations,
+        ),
+        "sfr_partial": partial_correlation_and_permutation_pvalue(
+            predictor=subset_sfr,
+            response=subset_score,
+            controls=controls_for_sfr,
+            seed=seed + 1,
+            permutations=permutations,
+        ),
+        "local_kappa_partial": partial_correlation_and_permutation_pvalue(
+            predictor=subset_local_kappa,
+            response=subset_score,
+            controls=controls_for_local_kappa,
+            seed=seed + 2,
+            permutations=permutations,
+        ),
+        "matched_group_effects": matched_group_effects,
+        "photometric_proxy_analysis": build_cluster_proxy_analysis(member_rows, "photometric_proxy", "photometric_proxy", seed + 3, permutations),
+        "muse_line_count_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_line_count_proxy", "muse_line_count_proxy", seed + 4, permutations),
+        "muse_emission_strength_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_emission_strength_proxy", "muse_emission_strength_proxy", seed + 5, permutations, line_count_key="muse_detected_emission_line_count"),
+        "muse_optical_complexity_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_optical_complexity_proxy", "muse_optical_complexity_proxy", seed + 6, permutations),
+        "muse_r23_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_r23_proxy", "muse_r23_proxy", seed + 7, permutations),
+        "muse_o32_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_o32_proxy", "muse_o32_proxy", seed + 8, permutations),
+        "muse_o3n2_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_o3n2_proxy", "muse_o3n2_proxy", seed + 9, permutations),
+        "muse_balmer_decrement_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_balmer_decrement_proxy", "muse_balmer_decrement_proxy", seed + 10, permutations),
+        "muse_n2_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_n2_proxy", "muse_n2_proxy", seed + 11, permutations),
+        "muse_m13_o3n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_m13_o3n2_oxygen_abundance", "muse_m13_o3n2_oxygen_abundance", seed + 12, permutations),
+        "muse_m13_n2_oxygen_abundance_analysis": build_muse_cluster_proxy_analysis(member_rows, "muse_m13_n2_oxygen_abundance", "muse_m13_n2_oxygen_abundance", seed + 13, permutations),
     }
 
 
@@ -1218,12 +1563,73 @@ def random_position_null(
 def combine_pvalues_fisher(pvalues: Iterable[float]) -> dict:
     cleaned = [min(max(float(p), 1e-300), 1.0) for p in pvalues if np.isfinite(p)]
     if not cleaned:
-        raise ValueError("No finite p-values supplied for Fisher combination.")
+        return {
+            "k": 0,
+            "statistic": float("nan"),
+            "p_value": float("nan"),
+        }
     statistic = float(-2.0 * np.sum(np.log(cleaned)))
     return {
         "k": len(cleaned),
         "statistic": statistic,
         "p_value": float(chi2.sf(statistic, 2 * len(cleaned))),
+    }
+
+
+def sign_consistent_replication(
+    correlations: Iterable[float],
+    pvalues: Iterable[float],
+    alpha: float = 0.05,
+    required_count: int = 2,
+) -> dict:
+    pairs = [
+        (float(correlation), float(p_value))
+        for correlation, p_value in zip(correlations, pvalues)
+        if np.isfinite(correlation) and np.isfinite(p_value)
+    ]
+    if not pairs:
+        return {
+            "finite_count": 0,
+            "positive_count": 0,
+            "negative_count": 0,
+            "direction": "insufficient",
+            "same_sign": False,
+            "significant_count": 0,
+            "sign_consistent_significant_count": 0,
+            "gate_pass": False,
+        }
+    positive_count = int(sum(correlation > 0.0 for correlation, _ in pairs))
+    negative_count = int(sum(correlation < 0.0 for correlation, _ in pairs))
+    if positive_count == len(pairs):
+        direction = "positive"
+        same_sign = True
+    elif negative_count == len(pairs):
+        direction = "negative"
+        same_sign = True
+    else:
+        direction = "mixed"
+        same_sign = False
+    significant_count = int(sum(p_value < alpha for _, p_value in pairs))
+    sign_consistent_significant_count = int(
+        sum(
+            p_value < alpha
+            and ((direction == "positive" and correlation > 0.0) or (direction == "negative" and correlation < 0.0))
+            for correlation, p_value in pairs
+        )
+    )
+    return {
+        "finite_count": len(pairs),
+        "positive_count": positive_count,
+        "negative_count": negative_count,
+        "direction": direction,
+        "same_sign": same_sign,
+        "significant_count": significant_count,
+        "sign_consistent_significant_count": sign_consistent_significant_count,
+        "gate_pass": bool(
+            same_sign
+            and len(pairs) >= required_count
+            and sign_consistent_significant_count == len(pairs)
+        ),
     }
 
 
@@ -1238,7 +1644,11 @@ def fisher_meta_correlation(correlations: Iterable[float], sample_sizes: Iterabl
         weighted_terms.append(weight * np.arctanh(clipped))
         total_weight += weight
     if total_weight == 0.0:
-        raise ValueError("No valid correlations supplied for meta-analysis.")
+        return {
+            "combined_correlation": float("nan"),
+            "weight_sum": 0.0,
+            "k": 0,
+        }
     combined_z = float(np.sum(weighted_terms) / total_weight)
     return {
         "combined_correlation": float(np.tanh(combined_z)),
@@ -1322,6 +1732,7 @@ def analyze_hff_cluster_map(
     catalog_path: Path,
     photometric_proxy_lookup: dict[int, dict],
     muse_proxy_lookup: dict[int, dict],
+    deep_spec_lookup: dict[int, dict],
     kappa_path: Path,
     out_dir: Path,
     result_prefix: str,
@@ -1416,6 +1827,7 @@ def analyze_hff_cluster_map(
             is_cluster_member = int(cluster_z_min <= zbest <= cluster_z_max)
             photometric_info = photometric_proxy_lookup.get(int(record["IDcat"]), {})
             muse_info = muse_proxy_lookup.get(int(record["IDcat"]), {})
+            deep_spec_info = deep_spec_lookup.get(int(record["IDcat"]), {})
 
             row = {
                 "IDcat": int(record["IDcat"]),
@@ -1440,11 +1852,23 @@ def analyze_hff_cluster_map(
                 "muse_line_count_proxy": muse_info.get("muse_line_count_proxy", float("nan")),
                 "muse_emission_strength_proxy": muse_info.get("muse_emission_strength_proxy", float("nan")),
                 "muse_optical_complexity_proxy": muse_info.get("muse_optical_complexity_proxy", float("nan")),
+                "muse_r23_proxy": muse_info.get("muse_r23_proxy", float("nan")),
+                "muse_o32_proxy": muse_info.get("muse_o32_proxy", float("nan")),
+                "muse_o3n2_proxy": muse_info.get("muse_o3n2_proxy", float("nan")),
+                "muse_n2_proxy": muse_info.get("muse_n2_proxy", float("nan")),
+                "muse_balmer_decrement_proxy": muse_info.get("muse_balmer_decrement_proxy", float("nan")),
+                "muse_m13_o3n2_oxygen_abundance": muse_info.get("muse_m13_o3n2_oxygen_abundance", float("nan")),
+                "muse_m13_n2_oxygen_abundance": muse_info.get("muse_m13_n2_oxygen_abundance", float("nan")),
                 "muse_detected_line_count": muse_info.get("muse_detected_line_count", 0),
                 "muse_detected_emission_line_count": muse_info.get("muse_detected_emission_line_count", 0),
                 "muse_match_sep_arcsec": muse_info.get("muse_match_sep_arcsec", float("nan")),
                 "muse_redshift": muse_info.get("muse_redshift", float("nan")),
                 "muse_zconf": muse_info.get("muse_zconf", float("nan")),
+                "deep_spec_match_sep_arcsec": deep_spec_info.get("deep_spec_match_sep_arcsec", float("nan")),
+                "deep_spec_redshift": deep_spec_info.get("deep_spec_redshift", float("nan")),
+                "deep_spec_quality": deep_spec_info.get("deep_spec_quality", float("nan")),
+                "deep_spec_secure": deep_spec_info.get("deep_spec_secure", 0),
+                "deep_spec_cluster_member": deep_spec_info.get("deep_spec_cluster_member", 0),
                 "inner_mean": inner_mean,
                 "ring_mean": ring_mean,
                 "sign_flip_score": sign_flip_score,
@@ -1566,100 +1990,85 @@ def analyze_hff_cluster_map(
             }
         )
 
-    muse_line_count_analysis = build_cluster_proxy_analysis(
+    muse_line_count_analysis = build_muse_cluster_proxy_analysis(
         cluster_rows=cluster_rows,
         proxy_key="muse_line_count_proxy",
         predictor_name="muse_line_count_proxy",
         seed=seed + 4,
         permutations=permutations,
     )
-    muse_line_count_rows = [row for row in cluster_rows if np.isfinite(float(row["muse_line_count_proxy"]))]
-    if muse_line_count_rows:
-        muse_line_count_analysis.update(
-            {
-                "median_proxy_match_sep_arcsec": float(
-                    np.nanmedian(np.asarray([row["muse_match_sep_arcsec"] for row in muse_line_count_rows], dtype=float))
-                ),
-                "median_proxy_line_count": float(
-                    np.nanmedian(np.asarray([row["muse_detected_line_count"] for row in muse_line_count_rows], dtype=float))
-                ),
-                "median_proxy_zconf": float(
-                    np.nanmedian(np.asarray([row["muse_zconf"] for row in muse_line_count_rows], dtype=float))
-                ),
-            }
-        )
-    else:
-        muse_line_count_analysis.update(
-            {
-                "median_proxy_match_sep_arcsec": float("nan"),
-                "median_proxy_line_count": float("nan"),
-                "median_proxy_zconf": float("nan"),
-            }
-        )
-
-    muse_emission_strength_analysis = build_cluster_proxy_analysis(
+    muse_emission_strength_analysis = build_muse_cluster_proxy_analysis(
         cluster_rows=cluster_rows,
         proxy_key="muse_emission_strength_proxy",
         predictor_name="muse_emission_strength_proxy",
         seed=seed + 5,
         permutations=permutations,
+        line_count_key="muse_detected_emission_line_count",
     )
-    muse_emission_rows = [row for row in cluster_rows if np.isfinite(float(row["muse_emission_strength_proxy"]))]
-    if muse_emission_rows:
-        muse_emission_strength_analysis.update(
-            {
-                "median_proxy_match_sep_arcsec": float(
-                    np.nanmedian(np.asarray([row["muse_match_sep_arcsec"] for row in muse_emission_rows], dtype=float))
-                ),
-                "median_proxy_emission_line_count": float(
-                    np.nanmedian(np.asarray([row["muse_detected_emission_line_count"] for row in muse_emission_rows], dtype=float))
-                ),
-                "median_proxy_zconf": float(
-                    np.nanmedian(np.asarray([row["muse_zconf"] for row in muse_emission_rows], dtype=float))
-                ),
-            }
-        )
-    else:
-        muse_emission_strength_analysis.update(
-            {
-                "median_proxy_match_sep_arcsec": float("nan"),
-                "median_proxy_emission_line_count": float("nan"),
-                "median_proxy_zconf": float("nan"),
-            }
-        )
-
-    muse_optical_complexity_analysis = build_cluster_proxy_analysis(
+    muse_optical_complexity_analysis = build_muse_cluster_proxy_analysis(
         cluster_rows=cluster_rows,
         proxy_key="muse_optical_complexity_proxy",
         predictor_name="muse_optical_complexity_proxy",
         seed=seed + 6,
         permutations=permutations,
     )
-    muse_optical_rows = [row for row in cluster_rows if np.isfinite(float(row["muse_optical_complexity_proxy"]))]
-    if muse_optical_rows:
-        muse_optical_complexity_analysis.update(
-            {
-                "median_proxy_match_sep_arcsec": float(
-                    np.nanmedian(np.asarray([row["muse_match_sep_arcsec"] for row in muse_optical_rows], dtype=float))
-                ),
-                "median_proxy_line_count": float(
-                    np.nanmedian(np.asarray([row["muse_detected_line_count"] for row in muse_optical_rows], dtype=float))
-                ),
-                "median_proxy_zconf": float(
-                    np.nanmedian(np.asarray([row["muse_zconf"] for row in muse_optical_rows], dtype=float))
-                ),
-            }
-        )
-    else:
-        muse_optical_complexity_analysis.update(
-            {
-                "median_proxy_match_sep_arcsec": float("nan"),
-                "median_proxy_line_count": float("nan"),
-                "median_proxy_zconf": float("nan"),
-            }
-        )
+    muse_r23_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_r23_proxy",
+        predictor_name="muse_r23_proxy",
+        seed=seed + 7,
+        permutations=permutations,
+    )
+    muse_o32_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_o32_proxy",
+        predictor_name="muse_o32_proxy",
+        seed=seed + 8,
+        permutations=permutations,
+    )
+    muse_o3n2_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_o3n2_proxy",
+        predictor_name="muse_o3n2_proxy",
+        seed=seed + 9,
+        permutations=permutations,
+    )
+    muse_balmer_decrement_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_balmer_decrement_proxy",
+        predictor_name="muse_balmer_decrement_proxy",
+        seed=seed + 10,
+        permutations=permutations,
+    )
+    muse_n2_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_n2_proxy",
+        predictor_name="muse_n2_proxy",
+        seed=seed + 11,
+        permutations=permutations,
+    )
+    muse_m13_o3n2_oxygen_abundance_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_m13_o3n2_oxygen_abundance",
+        predictor_name="muse_m13_o3n2_oxygen_abundance",
+        seed=seed + 12,
+        permutations=permutations,
+    )
+    muse_m13_n2_oxygen_abundance_analysis = build_muse_cluster_proxy_analysis(
+        cluster_rows=cluster_rows,
+        proxy_key="muse_m13_n2_oxygen_abundance",
+        predictor_name="muse_m13_n2_oxygen_abundance",
+        seed=seed + 13,
+        permutations=permutations,
+    )
 
     cluster_mean_score = float(np.mean(cluster_score))
+    deep_spec_cluster_rows = [row for row in cluster_rows if int(row.get("deep_spec_cluster_member", 0)) == 1]
+    deep_spec_cluster_analysis = build_member_subset_analysis(
+        deep_spec_cluster_rows,
+        seed=seed + 500,
+        permutations=permutations,
+    )
     try:
         random_null = random_position_null(
             residual=residual,
@@ -1734,6 +2143,14 @@ def analyze_hff_cluster_map(
             "muse_line_count_analysis": muse_line_count_analysis,
             "muse_emission_strength_analysis": muse_emission_strength_analysis,
             "muse_optical_complexity_analysis": muse_optical_complexity_analysis,
+            "muse_r23_analysis": muse_r23_analysis,
+            "muse_o32_analysis": muse_o32_analysis,
+            "muse_o3n2_analysis": muse_o3n2_analysis,
+            "muse_balmer_decrement_analysis": muse_balmer_decrement_analysis,
+            "muse_n2_analysis": muse_n2_analysis,
+            "muse_m13_o3n2_oxygen_abundance_analysis": muse_m13_o3n2_oxygen_abundance_analysis,
+            "muse_m13_n2_oxygen_abundance_analysis": muse_m13_n2_oxygen_abundance_analysis,
+            "deep_spectroscopy_member_analysis": deep_spec_cluster_analysis,
             "random_position_null": {
                 "mean_of_draw_means": random_null["mean_of_draw_means"],
                 "std_of_draw_means": random_null["std_of_draw_means"],
@@ -1791,6 +2208,10 @@ def analyze_hff_cluster_firstpass(
         products[config["muse_lines_key"]],
         inputs_dir / config["muse_lines_filename"],
     )
+    deep_spec_path = download_file(
+        products[config["deep_spec_key"]],
+        inputs_dir / config["deep_spec_filename"],
+    )
     kappa_path = download_file(
         products[config["kappa_key"]],
         inputs_dir / config["kappa_filename"],
@@ -1803,11 +2224,19 @@ def analyze_hff_cluster_firstpass(
         cluster_z_min=cluster_z_min,
         cluster_z_max=cluster_z_max,
     )
+    deep_spec_lookup = load_deep_spectroscopy_lookup(
+        cluster_key=cluster_key,
+        catalog_path=catalog_path,
+        deep_spec_path=deep_spec_path,
+        cluster_z_min=cluster_z_min,
+        cluster_z_max=cluster_z_max,
+    )
     return analyze_hff_cluster_map(
         cluster_key=cluster_key,
         catalog_path=catalog_path,
         photometric_proxy_lookup=photometric_proxy_lookup,
         muse_proxy_lookup=muse_proxy_lookup,
+        deep_spec_lookup=deep_spec_lookup,
         kappa_path=kappa_path,
         out_dir=out_dir,
         result_prefix=f"{cluster_key}_firstpass",
@@ -1820,6 +2249,8 @@ def analyze_hff_cluster_firstpass(
             "muse_lines_catalog_url": products[config["muse_lines_key"]],
             "muse_lines_catalog_filename": muse_lines_path.name,
             "muse_catalog_name": "MUSE Lensing Clusters v1.0",
+            "deep_spectroscopy_catalog_url": products[config["deep_spec_key"]],
+            "deep_spectroscopy_catalog_filename": deep_spec_path.name,
             "properties_catalog_url": products[config["catalog_key"]],
             "properties_catalog_filename": catalog_path.name,
             "kappa_map_url": products[config["kappa_key"]],
@@ -1846,6 +2277,14 @@ def summarize_cluster_result(result: dict) -> dict:
     muse_line = cluster.get("muse_line_count_analysis", {})
     muse_emission = cluster.get("muse_emission_strength_analysis", {})
     muse_optical = cluster.get("muse_optical_complexity_analysis", {})
+    muse_r23 = cluster.get("muse_r23_analysis", {})
+    muse_o32 = cluster.get("muse_o32_analysis", {})
+    muse_o3n2 = cluster.get("muse_o3n2_analysis", {})
+    muse_balmer = cluster.get("muse_balmer_decrement_analysis", {})
+    muse_n2 = cluster.get("muse_n2_analysis", {})
+    muse_m13_o3n2 = cluster.get("muse_m13_o3n2_oxygen_abundance_analysis", {})
+    muse_m13_n2 = cluster.get("muse_m13_n2_oxygen_abundance_analysis", {})
+    deep_spec = cluster.get("deep_spectroscopy_member_analysis", {})
     matched = cluster.get("matched_group_effects", {})
     return {
         "cluster": result["cluster"],
@@ -1894,7 +2333,7 @@ def summarize_cluster_result(result: dict) -> dict:
         "muse_emission_strength_partial_p_value": muse_emission.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
         "muse_emission_strength_matched_mean_difference": muse_emission.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
         "muse_emission_strength_matched_p_value": muse_emission.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
-        "median_muse_emission_line_count": muse_emission.get("median_proxy_emission_line_count", float("nan")),
+        "median_muse_emission_line_count": muse_emission.get("median_proxy_line_count", float("nan")),
         "n_cluster_members_with_muse_optical_proxy": muse_optical.get("n_cluster_members_with_proxy", 0),
         "muse_optical_complexity_partial_correlation": muse_optical.get("proxy_partial", {}).get("partial_correlation", float("nan")),
         "muse_optical_complexity_partial_p_value": muse_optical.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
@@ -1903,6 +2342,74 @@ def summarize_cluster_result(result: dict) -> dict:
         "median_muse_optical_match_sep_arcsec": muse_optical.get("median_proxy_match_sep_arcsec", float("nan")),
         "median_muse_optical_line_count": muse_optical.get("median_proxy_line_count", float("nan")),
         "median_muse_optical_zconf": muse_optical.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_r23_proxy": muse_r23.get("n_cluster_members_with_proxy", 0),
+        "muse_r23_partial_correlation": muse_r23.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_r23_partial_p_value": muse_r23.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_r23_matched_mean_difference": muse_r23.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_r23_matched_p_value": muse_r23.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_r23_match_sep_arcsec": muse_r23.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_r23_line_count": muse_r23.get("median_proxy_line_count", float("nan")),
+        "median_muse_r23_zconf": muse_r23.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_o32_proxy": muse_o32.get("n_cluster_members_with_proxy", 0),
+        "muse_o32_partial_correlation": muse_o32.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_o32_partial_p_value": muse_o32.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_o32_matched_mean_difference": muse_o32.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_o32_matched_p_value": muse_o32.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_o32_match_sep_arcsec": muse_o32.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_o32_line_count": muse_o32.get("median_proxy_line_count", float("nan")),
+        "median_muse_o32_zconf": muse_o32.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_o3n2_proxy": muse_o3n2.get("n_cluster_members_with_proxy", 0),
+        "muse_o3n2_partial_correlation": muse_o3n2.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_o3n2_partial_p_value": muse_o3n2.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_o3n2_matched_mean_difference": muse_o3n2.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_o3n2_matched_p_value": muse_o3n2.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_o3n2_match_sep_arcsec": muse_o3n2.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_o3n2_line_count": muse_o3n2.get("median_proxy_line_count", float("nan")),
+        "median_muse_o3n2_zconf": muse_o3n2.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_balmer_proxy": muse_balmer.get("n_cluster_members_with_proxy", 0),
+        "muse_balmer_decrement_partial_correlation": muse_balmer.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_balmer_decrement_partial_p_value": muse_balmer.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_balmer_decrement_matched_mean_difference": muse_balmer.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_balmer_decrement_matched_p_value": muse_balmer.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_balmer_match_sep_arcsec": muse_balmer.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_balmer_line_count": muse_balmer.get("median_proxy_line_count", float("nan")),
+        "median_muse_balmer_zconf": muse_balmer.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_n2_proxy": muse_n2.get("n_cluster_members_with_proxy", 0),
+        "muse_n2_partial_correlation": muse_n2.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_n2_partial_p_value": muse_n2.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_n2_matched_mean_difference": muse_n2.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_n2_matched_p_value": muse_n2.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_n2_match_sep_arcsec": muse_n2.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_n2_line_count": muse_n2.get("median_proxy_line_count", float("nan")),
+        "median_muse_n2_zconf": muse_n2.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_m13_o3n2_oxygen_abundance": muse_m13_o3n2.get("n_cluster_members_with_proxy", 0),
+        "muse_m13_o3n2_oxygen_abundance_partial_correlation": muse_m13_o3n2.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_m13_o3n2_oxygen_abundance_partial_p_value": muse_m13_o3n2.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_m13_o3n2_oxygen_abundance_matched_mean_difference": muse_m13_o3n2.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_m13_o3n2_oxygen_abundance_matched_p_value": muse_m13_o3n2.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_m13_o3n2_oxygen_abundance_match_sep_arcsec": muse_m13_o3n2.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_m13_o3n2_oxygen_abundance_line_count": muse_m13_o3n2.get("median_proxy_line_count", float("nan")),
+        "median_muse_m13_o3n2_oxygen_abundance_zconf": muse_m13_o3n2.get("median_proxy_zconf", float("nan")),
+        "n_cluster_members_with_muse_m13_n2_oxygen_abundance": muse_m13_n2.get("n_cluster_members_with_proxy", 0),
+        "muse_m13_n2_oxygen_abundance_partial_correlation": muse_m13_n2.get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "muse_m13_n2_oxygen_abundance_partial_p_value": muse_m13_n2.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "muse_m13_n2_oxygen_abundance_matched_mean_difference": muse_m13_n2.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "muse_m13_n2_oxygen_abundance_matched_p_value": muse_m13_n2.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "median_muse_m13_n2_oxygen_abundance_match_sep_arcsec": muse_m13_n2.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_muse_m13_n2_oxygen_abundance_line_count": muse_m13_n2.get("median_proxy_line_count", float("nan")),
+        "median_muse_m13_n2_oxygen_abundance_zconf": muse_m13_n2.get("median_proxy_zconf", float("nan")),
+        "n_deep_spec_cluster_members": deep_spec.get("n_members", 0),
+        "deep_spec_mean_score": deep_spec.get("mean_score", float("nan")),
+        "deep_spec_mass_partial_correlation": deep_spec.get("mass_partial", {}).get("partial_correlation", float("nan")),
+        "deep_spec_mass_partial_p_value": deep_spec.get("mass_partial", {}).get("permutation_p_value", float("nan")),
+        "deep_spec_local_kappa_partial_correlation": deep_spec.get("local_kappa_partial", {}).get("partial_correlation", float("nan")),
+        "deep_spec_local_kappa_partial_p_value": deep_spec.get("local_kappa_partial", {}).get("permutation_p_value", float("nan")),
+        "deep_spec_photometric_proxy_partial_correlation": deep_spec.get("photometric_proxy_analysis", {}).get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "deep_spec_photometric_proxy_partial_p_value": deep_spec.get("photometric_proxy_analysis", {}).get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "deep_spec_muse_line_count_partial_correlation": deep_spec.get("muse_line_count_analysis", {}).get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "deep_spec_muse_line_count_partial_p_value": deep_spec.get("muse_line_count_analysis", {}).get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "deep_spec_muse_optical_complexity_partial_correlation": deep_spec.get("muse_optical_complexity_analysis", {}).get("proxy_partial", {}).get("partial_correlation", float("nan")),
+        "deep_spec_muse_optical_complexity_partial_p_value": deep_spec.get("muse_optical_complexity_analysis", {}).get("proxy_partial", {}).get("permutation_p_value", float("nan")),
         "random_null_p_value": cluster["random_position_null"]["p_value_cluster_mean_gt_random"],
     }
 
@@ -1942,11 +2449,22 @@ def analyze_hff_cluster_model_ensemble(
         products[config["muse_lines_key"]],
         inputs_dir / config["muse_lines_filename"],
     )
+    deep_spec_path = download_file(
+        products[config["deep_spec_key"]],
+        inputs_dir / config["deep_spec_filename"],
+    )
     photometric_proxy_lookup = load_photometric_proxy_lookup(catalog_path, proxy_catalog_path)
     muse_proxy_lookup = load_muse_proxy_lookup(
         catalog_path=catalog_path,
         muse_redshift_path=muse_redshift_path,
         muse_lines_path=muse_lines_path,
+        cluster_z_min=cluster_z_min,
+        cluster_z_max=cluster_z_max,
+    )
+    deep_spec_lookup = load_deep_spectroscopy_lookup(
+        cluster_key=cluster_key,
+        catalog_path=catalog_path,
+        deep_spec_path=deep_spec_path,
         cluster_z_min=cluster_z_min,
         cluster_z_max=cluster_z_max,
     )
@@ -1975,6 +2493,7 @@ def analyze_hff_cluster_model_ensemble(
             catalog_path=catalog_path,
             photometric_proxy_lookup=photometric_proxy_lookup,
             muse_proxy_lookup=muse_proxy_lookup,
+            deep_spec_lookup=deep_spec_lookup,
             kappa_path=kappa_path,
             out_dir=out_dir,
             result_prefix=result_prefix,
@@ -1987,6 +2506,8 @@ def analyze_hff_cluster_model_ensemble(
                 "muse_lines_catalog_url": products[config["muse_lines_key"]],
                 "muse_lines_catalog_filename": muse_lines_path.name,
                 "muse_catalog_name": "MUSE Lensing Clusters v1.0",
+                "deep_spectroscopy_catalog_url": products[config["deep_spec_key"]],
+                "deep_spectroscopy_catalog_filename": deep_spec_path.name,
                 "properties_catalog_url": products[config["catalog_key"]],
                 "properties_catalog_filename": catalog_path.name,
                 "kappa_map_url": kappa_url,
@@ -2023,6 +2544,31 @@ def analyze_hff_cluster_model_ensemble(
     muse_emission_p = np.asarray([row["muse_emission_strength_partial_p_value"] for row in model_summaries], dtype=float)
     muse_optical_corr = np.asarray([row["muse_optical_complexity_partial_correlation"] for row in model_summaries], dtype=float)
     muse_optical_p = np.asarray([row["muse_optical_complexity_partial_p_value"] for row in model_summaries], dtype=float)
+    muse_r23_corr = np.asarray([row["muse_r23_partial_correlation"] for row in model_summaries], dtype=float)
+    muse_r23_p = np.asarray([row["muse_r23_partial_p_value"] for row in model_summaries], dtype=float)
+    muse_o32_corr = np.asarray([row["muse_o32_partial_correlation"] for row in model_summaries], dtype=float)
+    muse_o32_p = np.asarray([row["muse_o32_partial_p_value"] for row in model_summaries], dtype=float)
+    muse_o3n2_corr = np.asarray([row["muse_o3n2_partial_correlation"] for row in model_summaries], dtype=float)
+    muse_o3n2_p = np.asarray([row["muse_o3n2_partial_p_value"] for row in model_summaries], dtype=float)
+    muse_balmer_corr = np.asarray([row["muse_balmer_decrement_partial_correlation"] for row in model_summaries], dtype=float)
+    muse_balmer_p = np.asarray([row["muse_balmer_decrement_partial_p_value"] for row in model_summaries], dtype=float)
+    muse_n2_corr = np.asarray([row["muse_n2_partial_correlation"] for row in model_summaries], dtype=float)
+    muse_n2_p = np.asarray([row["muse_n2_partial_p_value"] for row in model_summaries], dtype=float)
+    muse_m13_o3n2_corr = np.asarray([row["muse_m13_o3n2_oxygen_abundance_partial_correlation"] for row in model_summaries], dtype=float)
+    muse_m13_o3n2_p = np.asarray([row["muse_m13_o3n2_oxygen_abundance_partial_p_value"] for row in model_summaries], dtype=float)
+    muse_m13_n2_corr = np.asarray([row["muse_m13_n2_oxygen_abundance_partial_correlation"] for row in model_summaries], dtype=float)
+    muse_m13_n2_p = np.asarray([row["muse_m13_n2_oxygen_abundance_partial_p_value"] for row in model_summaries], dtype=float)
+    deep_spec_mass_corr = np.asarray([row["deep_spec_mass_partial_correlation"] for row in model_summaries], dtype=float)
+    deep_spec_mass_p = np.asarray([row["deep_spec_mass_partial_p_value"] for row in model_summaries], dtype=float)
+    deep_spec_local_kappa_corr = np.asarray([row["deep_spec_local_kappa_partial_correlation"] for row in model_summaries], dtype=float)
+    deep_spec_local_kappa_p = np.asarray([row["deep_spec_local_kappa_partial_p_value"] for row in model_summaries], dtype=float)
+    deep_spec_proxy_corr = np.asarray([row["deep_spec_photometric_proxy_partial_correlation"] for row in model_summaries], dtype=float)
+    deep_spec_proxy_p = np.asarray([row["deep_spec_photometric_proxy_partial_p_value"] for row in model_summaries], dtype=float)
+    deep_spec_muse_line_corr = np.asarray([row["deep_spec_muse_line_count_partial_correlation"] for row in model_summaries], dtype=float)
+    deep_spec_muse_line_p = np.asarray([row["deep_spec_muse_line_count_partial_p_value"] for row in model_summaries], dtype=float)
+    deep_spec_muse_optical_corr = np.asarray([row["deep_spec_muse_optical_complexity_partial_correlation"] for row in model_summaries], dtype=float)
+    deep_spec_muse_optical_p = np.asarray([row["deep_spec_muse_optical_complexity_partial_p_value"] for row in model_summaries], dtype=float)
+    deep_spec_member_counts = np.asarray([row["n_deep_spec_cluster_members"] for row in model_summaries], dtype=float)
     random_p = np.asarray([row["random_null_p_value"] for row in model_summaries], dtype=float)
     member_counts = np.asarray([row["n_cluster_members"] for row in model_summaries], dtype=float)
     mean_scores = np.asarray([row["mean_score"] for row in model_summaries], dtype=float)
@@ -2065,18 +2611,55 @@ def analyze_hff_cluster_model_ensemble(
             "local_kappa_max_partial_correlation": float(np.max(local_kappa_corr)),
             "photometric_proxy_positive_fraction": float(np.mean(proxy_corr > 0.0)),
             "photometric_proxy_significant_fraction": float(np.mean((proxy_corr > 0.0) & (proxy_p < 0.05))),
-            "photometric_proxy_median_partial_correlation": float(np.nanmedian(proxy_corr)),
+            "photometric_proxy_median_partial_correlation": nanmedian_or_nan(proxy_corr),
             "photometric_proxy_min_partial_correlation": float(np.nanmin(proxy_corr)),
             "photometric_proxy_max_partial_correlation": float(np.nanmax(proxy_corr)),
             "muse_line_count_positive_fraction": float(np.mean(muse_line_corr > 0.0)),
             "muse_line_count_significant_fraction": float(np.mean((muse_line_corr > 0.0) & (muse_line_p < 0.05))),
-            "muse_line_count_median_partial_correlation": float(np.nanmedian(muse_line_corr)),
+            "muse_line_count_median_partial_correlation": nanmedian_or_nan(muse_line_corr),
             "muse_emission_strength_positive_fraction": float(np.mean(muse_emission_corr > 0.0)),
             "muse_emission_strength_significant_fraction": float(np.mean((muse_emission_corr > 0.0) & (muse_emission_p < 0.05))),
-            "muse_emission_strength_median_partial_correlation": float(np.nanmedian(muse_emission_corr)),
+            "muse_emission_strength_median_partial_correlation": nanmedian_or_nan(muse_emission_corr),
             "muse_optical_complexity_positive_fraction": float(np.mean(muse_optical_corr > 0.0)),
             "muse_optical_complexity_significant_fraction": float(np.mean((muse_optical_corr > 0.0) & (muse_optical_p < 0.05))),
-            "muse_optical_complexity_median_partial_correlation": float(np.nanmedian(muse_optical_corr)),
+            "muse_optical_complexity_median_partial_correlation": nanmedian_or_nan(muse_optical_corr),
+            "muse_r23_positive_fraction": float(np.mean(muse_r23_corr > 0.0)),
+            "muse_r23_significant_fraction": float(np.mean((muse_r23_corr > 0.0) & (muse_r23_p < 0.05))),
+            "muse_r23_median_partial_correlation": nanmedian_or_nan(muse_r23_corr),
+            "muse_o32_positive_fraction": float(np.mean(muse_o32_corr > 0.0)),
+            "muse_o32_significant_fraction": float(np.mean((muse_o32_corr > 0.0) & (muse_o32_p < 0.05))),
+            "muse_o32_median_partial_correlation": nanmedian_or_nan(muse_o32_corr),
+            "muse_o3n2_positive_fraction": float(np.mean(muse_o3n2_corr > 0.0)),
+            "muse_o3n2_significant_fraction": float(np.mean((muse_o3n2_corr > 0.0) & (muse_o3n2_p < 0.05))),
+            "muse_o3n2_median_partial_correlation": nanmedian_or_nan(muse_o3n2_corr),
+            "muse_balmer_decrement_positive_fraction": float(np.mean(muse_balmer_corr > 0.0)),
+            "muse_balmer_decrement_significant_fraction": float(np.mean((muse_balmer_corr > 0.0) & (muse_balmer_p < 0.05))),
+            "muse_balmer_decrement_median_partial_correlation": nanmedian_or_nan(muse_balmer_corr),
+            "muse_n2_positive_fraction": float(np.mean(muse_n2_corr > 0.0)),
+            "muse_n2_significant_fraction": float(np.mean((muse_n2_corr > 0.0) & (muse_n2_p < 0.05))),
+            "muse_n2_median_partial_correlation": nanmedian_or_nan(muse_n2_corr),
+            "muse_m13_o3n2_oxygen_abundance_positive_fraction": float(np.mean(muse_m13_o3n2_corr > 0.0)),
+            "muse_m13_o3n2_oxygen_abundance_significant_fraction": float(np.mean((muse_m13_o3n2_corr > 0.0) & (muse_m13_o3n2_p < 0.05))),
+            "muse_m13_o3n2_oxygen_abundance_median_partial_correlation": nanmedian_or_nan(muse_m13_o3n2_corr),
+            "muse_m13_n2_oxygen_abundance_positive_fraction": float(np.mean(muse_m13_n2_corr > 0.0)),
+            "muse_m13_n2_oxygen_abundance_significant_fraction": float(np.mean((muse_m13_n2_corr > 0.0) & (muse_m13_n2_p < 0.05))),
+            "muse_m13_n2_oxygen_abundance_median_partial_correlation": nanmedian_or_nan(muse_m13_n2_corr),
+            "mean_deep_spec_cluster_members": float(np.mean(deep_spec_member_counts)),
+            "deep_spec_mass_positive_fraction": float(np.mean(deep_spec_mass_corr > 0.0)),
+            "deep_spec_mass_significant_fraction": float(np.mean((deep_spec_mass_corr > 0.0) & (deep_spec_mass_p < 0.05))),
+            "deep_spec_mass_median_partial_correlation": nanmedian_or_nan(deep_spec_mass_corr),
+            "deep_spec_local_kappa_positive_fraction": float(np.mean(deep_spec_local_kappa_corr > 0.0)),
+            "deep_spec_local_kappa_significant_fraction": float(np.mean((deep_spec_local_kappa_corr > 0.0) & (deep_spec_local_kappa_p < 0.05))),
+            "deep_spec_local_kappa_median_partial_correlation": nanmedian_or_nan(deep_spec_local_kappa_corr),
+            "deep_spec_photometric_proxy_positive_fraction": float(np.mean(deep_spec_proxy_corr > 0.0)),
+            "deep_spec_photometric_proxy_significant_fraction": float(np.mean((deep_spec_proxy_corr > 0.0) & (deep_spec_proxy_p < 0.05))),
+            "deep_spec_photometric_proxy_median_partial_correlation": nanmedian_or_nan(deep_spec_proxy_corr),
+            "deep_spec_muse_line_count_positive_fraction": float(np.mean(deep_spec_muse_line_corr > 0.0)),
+            "deep_spec_muse_line_count_significant_fraction": float(np.mean((deep_spec_muse_line_corr > 0.0) & (deep_spec_muse_line_p < 0.05))),
+            "deep_spec_muse_line_count_median_partial_correlation": nanmedian_or_nan(deep_spec_muse_line_corr),
+            "deep_spec_muse_optical_complexity_positive_fraction": float(np.mean(deep_spec_muse_optical_corr > 0.0)),
+            "deep_spec_muse_optical_complexity_significant_fraction": float(np.mean((deep_spec_muse_optical_corr > 0.0) & (deep_spec_muse_optical_p < 0.05))),
+            "deep_spec_muse_optical_complexity_median_partial_correlation": nanmedian_or_nan(deep_spec_muse_optical_corr),
             "random_null_significant_fraction": float(np.mean(random_p < 0.05)),
         },
     }
@@ -2142,6 +2725,20 @@ def analyze_combined_hff_firstpass(
     muse_emission_ps = [item["muse_emission_strength_partial_p_value"] for item in cluster_summaries]
     muse_optical_corrs = [item["muse_optical_complexity_partial_correlation"] for item in cluster_summaries]
     muse_optical_ps = [item["muse_optical_complexity_partial_p_value"] for item in cluster_summaries]
+    muse_r23_corrs = [item["muse_r23_partial_correlation"] for item in cluster_summaries]
+    muse_r23_ps = [item["muse_r23_partial_p_value"] for item in cluster_summaries]
+    muse_o32_corrs = [item["muse_o32_partial_correlation"] for item in cluster_summaries]
+    muse_o32_ps = [item["muse_o32_partial_p_value"] for item in cluster_summaries]
+    muse_o3n2_corrs = [item["muse_o3n2_partial_correlation"] for item in cluster_summaries]
+    muse_o3n2_ps = [item["muse_o3n2_partial_p_value"] for item in cluster_summaries]
+    muse_balmer_corrs = [item["muse_balmer_decrement_partial_correlation"] for item in cluster_summaries]
+    muse_balmer_ps = [item["muse_balmer_decrement_partial_p_value"] for item in cluster_summaries]
+    muse_n2_corrs = [item["muse_n2_partial_correlation"] for item in cluster_summaries]
+    muse_n2_ps = [item["muse_n2_partial_p_value"] for item in cluster_summaries]
+    muse_m13_o3n2_corrs = [item["muse_m13_o3n2_oxygen_abundance_partial_correlation"] for item in cluster_summaries]
+    muse_m13_o3n2_ps = [item["muse_m13_o3n2_oxygen_abundance_partial_p_value"] for item in cluster_summaries]
+    muse_m13_n2_corrs = [item["muse_m13_n2_oxygen_abundance_partial_correlation"] for item in cluster_summaries]
+    muse_m13_n2_ps = [item["muse_m13_n2_oxygen_abundance_partial_p_value"] for item in cluster_summaries]
     random_ps = [item["random_null_p_value"] for item in cluster_summaries]
 
     result = {
@@ -2178,6 +2775,20 @@ def analyze_combined_hff_firstpass(
             "muse_emission_strength_fisher": combine_pvalues_fisher(muse_emission_ps),
             "muse_optical_complexity_meta": fisher_meta_correlation(muse_optical_corrs, member_counts.astype(int)),
             "muse_optical_complexity_fisher": combine_pvalues_fisher(muse_optical_ps),
+            "muse_r23_meta": fisher_meta_correlation(muse_r23_corrs, member_counts.astype(int)),
+            "muse_r23_fisher": combine_pvalues_fisher(muse_r23_ps),
+            "muse_o32_meta": fisher_meta_correlation(muse_o32_corrs, member_counts.astype(int)),
+            "muse_o32_fisher": combine_pvalues_fisher(muse_o32_ps),
+            "muse_o3n2_meta": fisher_meta_correlation(muse_o3n2_corrs, member_counts.astype(int)),
+            "muse_o3n2_fisher": combine_pvalues_fisher(muse_o3n2_ps),
+            "muse_balmer_decrement_meta": fisher_meta_correlation(muse_balmer_corrs, member_counts.astype(int)),
+            "muse_balmer_decrement_fisher": combine_pvalues_fisher(muse_balmer_ps),
+            "muse_n2_meta": fisher_meta_correlation(muse_n2_corrs, member_counts.astype(int)),
+            "muse_n2_fisher": combine_pvalues_fisher(muse_n2_ps),
+            "muse_m13_o3n2_oxygen_abundance_meta": fisher_meta_correlation(muse_m13_o3n2_corrs, member_counts.astype(int)),
+            "muse_m13_o3n2_oxygen_abundance_fisher": combine_pvalues_fisher(muse_m13_o3n2_ps),
+            "muse_m13_n2_oxygen_abundance_meta": fisher_meta_correlation(muse_m13_n2_corrs, member_counts.astype(int)),
+            "muse_m13_n2_oxygen_abundance_fisher": combine_pvalues_fisher(muse_m13_n2_ps),
             "random_null_fisher": combine_pvalues_fisher(random_ps),
             "replication": {
                 "mass_positive_cluster_count": int(sum(value > 0.0 for value in mass_corrs)),
@@ -2208,7 +2819,51 @@ def analyze_combined_hff_firstpass(
                 "muse_optical_complexity_significant_cluster_count": int(
                     sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(muse_optical_corrs, muse_optical_ps))
                 ),
+                "muse_r23_positive_cluster_count": int(sum(value > 0.0 for value in muse_r23_corrs)),
+                "muse_r23_significant_cluster_count": int(
+                    sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(muse_r23_corrs, muse_r23_ps))
+                ),
+                "muse_o32_positive_cluster_count": int(sum(value > 0.0 for value in muse_o32_corrs)),
+                "muse_o32_significant_cluster_count": int(
+                    sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(muse_o32_corrs, muse_o32_ps))
+                ),
+                "muse_o3n2_positive_cluster_count": int(sum(value > 0.0 for value in muse_o3n2_corrs)),
+                "muse_o3n2_significant_cluster_count": int(
+                    sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(muse_o3n2_corrs, muse_o3n2_ps))
+                ),
+                "muse_balmer_decrement_positive_cluster_count": int(sum(value > 0.0 for value in muse_balmer_corrs)),
+                "muse_balmer_decrement_significant_cluster_count": int(
+                    sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(muse_balmer_corrs, muse_balmer_ps))
+                ),
+                "muse_n2_positive_cluster_count": int(sum(value > 0.0 for value in muse_n2_corrs)),
+                "muse_n2_significant_cluster_count": int(
+                    sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(muse_n2_corrs, muse_n2_ps))
+                ),
+                "muse_m13_o3n2_oxygen_abundance_positive_cluster_count": int(sum(value > 0.0 for value in muse_m13_o3n2_corrs)),
+                "muse_m13_o3n2_oxygen_abundance_significant_cluster_count": int(
+                    sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(muse_m13_o3n2_corrs, muse_m13_o3n2_ps))
+                ),
+                "muse_m13_n2_oxygen_abundance_positive_cluster_count": int(sum(value > 0.0 for value in muse_m13_n2_corrs)),
+                "muse_m13_n2_oxygen_abundance_significant_cluster_count": int(
+                    sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(muse_m13_n2_corrs, muse_m13_n2_ps))
+                ),
                 "random_null_significant_cluster_count": int(sum(p_value < 0.05 for p_value in random_ps)),
+            },
+            "replication_gate": {
+                "mass": sign_consistent_replication(mass_corrs, mass_ps),
+                "sfr": sign_consistent_replication(sfr_corrs, sfr_ps),
+                "local_kappa": sign_consistent_replication(local_kappa_corrs, local_kappa_ps),
+                "photometric_proxy": sign_consistent_replication(proxy_corrs, proxy_ps),
+                "muse_line_count": sign_consistent_replication(muse_line_corrs, muse_line_ps),
+                "muse_emission_strength": sign_consistent_replication(muse_emission_corrs, muse_emission_ps),
+                "muse_optical_complexity": sign_consistent_replication(muse_optical_corrs, muse_optical_ps),
+                "muse_r23": sign_consistent_replication(muse_r23_corrs, muse_r23_ps),
+                "muse_o32": sign_consistent_replication(muse_o32_corrs, muse_o32_ps),
+                "muse_o3n2": sign_consistent_replication(muse_o3n2_corrs, muse_o3n2_ps),
+                "muse_balmer_decrement": sign_consistent_replication(muse_balmer_corrs, muse_balmer_ps),
+                "muse_n2": sign_consistent_replication(muse_n2_corrs, muse_n2_ps),
+                "muse_m13_o3n2_oxygen_abundance": sign_consistent_replication(muse_m13_o3n2_corrs, muse_m13_o3n2_ps),
+                "muse_m13_n2_oxygen_abundance": sign_consistent_replication(muse_m13_n2_corrs, muse_m13_n2_ps),
             },
         },
     }
@@ -2305,6 +2960,31 @@ def run_full_experiment(
     muse_emission_p = np.asarray([row["muse_emission_strength_partial_p_value"] for row in all_model_rows], dtype=float)
     muse_optical_corr = np.asarray([row["muse_optical_complexity_partial_correlation"] for row in all_model_rows], dtype=float)
     muse_optical_p = np.asarray([row["muse_optical_complexity_partial_p_value"] for row in all_model_rows], dtype=float)
+    muse_r23_corr = np.asarray([row["muse_r23_partial_correlation"] for row in all_model_rows], dtype=float)
+    muse_r23_p = np.asarray([row["muse_r23_partial_p_value"] for row in all_model_rows], dtype=float)
+    muse_o32_corr = np.asarray([row["muse_o32_partial_correlation"] for row in all_model_rows], dtype=float)
+    muse_o32_p = np.asarray([row["muse_o32_partial_p_value"] for row in all_model_rows], dtype=float)
+    muse_o3n2_corr = np.asarray([row["muse_o3n2_partial_correlation"] for row in all_model_rows], dtype=float)
+    muse_o3n2_p = np.asarray([row["muse_o3n2_partial_p_value"] for row in all_model_rows], dtype=float)
+    muse_balmer_corr = np.asarray([row["muse_balmer_decrement_partial_correlation"] for row in all_model_rows], dtype=float)
+    muse_balmer_p = np.asarray([row["muse_balmer_decrement_partial_p_value"] for row in all_model_rows], dtype=float)
+    muse_n2_corr = np.asarray([row["muse_n2_partial_correlation"] for row in all_model_rows], dtype=float)
+    muse_n2_p = np.asarray([row["muse_n2_partial_p_value"] for row in all_model_rows], dtype=float)
+    muse_m13_o3n2_corr = np.asarray([row["muse_m13_o3n2_oxygen_abundance_partial_correlation"] for row in all_model_rows], dtype=float)
+    muse_m13_o3n2_p = np.asarray([row["muse_m13_o3n2_oxygen_abundance_partial_p_value"] for row in all_model_rows], dtype=float)
+    muse_m13_n2_corr = np.asarray([row["muse_m13_n2_oxygen_abundance_partial_correlation"] for row in all_model_rows], dtype=float)
+    muse_m13_n2_p = np.asarray([row["muse_m13_n2_oxygen_abundance_partial_p_value"] for row in all_model_rows], dtype=float)
+    deep_spec_mass_corr = np.asarray([row["deep_spec_mass_partial_correlation"] for row in all_model_rows], dtype=float)
+    deep_spec_mass_p = np.asarray([row["deep_spec_mass_partial_p_value"] for row in all_model_rows], dtype=float)
+    deep_spec_local_kappa_corr = np.asarray([row["deep_spec_local_kappa_partial_correlation"] for row in all_model_rows], dtype=float)
+    deep_spec_local_kappa_p = np.asarray([row["deep_spec_local_kappa_partial_p_value"] for row in all_model_rows], dtype=float)
+    deep_spec_proxy_corr = np.asarray([row["deep_spec_photometric_proxy_partial_correlation"] for row in all_model_rows], dtype=float)
+    deep_spec_proxy_p = np.asarray([row["deep_spec_photometric_proxy_partial_p_value"] for row in all_model_rows], dtype=float)
+    deep_spec_muse_line_corr = np.asarray([row["deep_spec_muse_line_count_partial_correlation"] for row in all_model_rows], dtype=float)
+    deep_spec_muse_line_p = np.asarray([row["deep_spec_muse_line_count_partial_p_value"] for row in all_model_rows], dtype=float)
+    deep_spec_muse_optical_corr = np.asarray([row["deep_spec_muse_optical_complexity_partial_correlation"] for row in all_model_rows], dtype=float)
+    deep_spec_muse_optical_p = np.asarray([row["deep_spec_muse_optical_complexity_partial_p_value"] for row in all_model_rows], dtype=float)
+    deep_spec_member_counts = np.asarray([row["n_deep_spec_cluster_members"] for row in all_model_rows], dtype=float)
     random_p = np.asarray([row["random_null_p_value"] for row in all_model_rows], dtype=float)
 
     result = {
@@ -2338,16 +3018,53 @@ def run_full_experiment(
             "local_kappa_median_partial_correlation": float(np.median(local_kappa_corr)),
             "photometric_proxy_positive_run_fraction": float(np.mean(proxy_corr > 0.0)),
             "photometric_proxy_significant_run_fraction": float(np.mean((proxy_corr > 0.0) & (proxy_p < 0.05))),
-            "photometric_proxy_median_partial_correlation": float(np.nanmedian(proxy_corr)),
+            "photometric_proxy_median_partial_correlation": nanmedian_or_nan(proxy_corr),
             "muse_line_count_positive_run_fraction": float(np.mean(muse_line_corr > 0.0)),
             "muse_line_count_significant_run_fraction": float(np.mean((muse_line_corr > 0.0) & (muse_line_p < 0.05))),
-            "muse_line_count_median_partial_correlation": float(np.nanmedian(muse_line_corr)),
+            "muse_line_count_median_partial_correlation": nanmedian_or_nan(muse_line_corr),
             "muse_emission_strength_positive_run_fraction": float(np.mean(muse_emission_corr > 0.0)),
             "muse_emission_strength_significant_run_fraction": float(np.mean((muse_emission_corr > 0.0) & (muse_emission_p < 0.05))),
-            "muse_emission_strength_median_partial_correlation": float(np.nanmedian(muse_emission_corr)),
+            "muse_emission_strength_median_partial_correlation": nanmedian_or_nan(muse_emission_corr),
             "muse_optical_complexity_positive_run_fraction": float(np.mean(muse_optical_corr > 0.0)),
             "muse_optical_complexity_significant_run_fraction": float(np.mean((muse_optical_corr > 0.0) & (muse_optical_p < 0.05))),
-            "muse_optical_complexity_median_partial_correlation": float(np.nanmedian(muse_optical_corr)),
+            "muse_optical_complexity_median_partial_correlation": nanmedian_or_nan(muse_optical_corr),
+            "muse_r23_positive_run_fraction": float(np.mean(muse_r23_corr > 0.0)),
+            "muse_r23_significant_run_fraction": float(np.mean((muse_r23_corr > 0.0) & (muse_r23_p < 0.05))),
+            "muse_r23_median_partial_correlation": nanmedian_or_nan(muse_r23_corr),
+            "muse_o32_positive_run_fraction": float(np.mean(muse_o32_corr > 0.0)),
+            "muse_o32_significant_run_fraction": float(np.mean((muse_o32_corr > 0.0) & (muse_o32_p < 0.05))),
+            "muse_o32_median_partial_correlation": nanmedian_or_nan(muse_o32_corr),
+            "muse_o3n2_positive_run_fraction": float(np.mean(muse_o3n2_corr > 0.0)),
+            "muse_o3n2_significant_run_fraction": float(np.mean((muse_o3n2_corr > 0.0) & (muse_o3n2_p < 0.05))),
+            "muse_o3n2_median_partial_correlation": nanmedian_or_nan(muse_o3n2_corr),
+            "muse_balmer_decrement_positive_run_fraction": float(np.mean(muse_balmer_corr > 0.0)),
+            "muse_balmer_decrement_significant_run_fraction": float(np.mean((muse_balmer_corr > 0.0) & (muse_balmer_p < 0.05))),
+            "muse_balmer_decrement_median_partial_correlation": nanmedian_or_nan(muse_balmer_corr),
+            "muse_n2_positive_run_fraction": float(np.mean(muse_n2_corr > 0.0)),
+            "muse_n2_significant_run_fraction": float(np.mean((muse_n2_corr > 0.0) & (muse_n2_p < 0.05))),
+            "muse_n2_median_partial_correlation": nanmedian_or_nan(muse_n2_corr),
+            "muse_m13_o3n2_oxygen_abundance_positive_run_fraction": float(np.mean(muse_m13_o3n2_corr > 0.0)),
+            "muse_m13_o3n2_oxygen_abundance_significant_run_fraction": float(np.mean((muse_m13_o3n2_corr > 0.0) & (muse_m13_o3n2_p < 0.05))),
+            "muse_m13_o3n2_oxygen_abundance_median_partial_correlation": nanmedian_or_nan(muse_m13_o3n2_corr),
+            "muse_m13_n2_oxygen_abundance_positive_run_fraction": float(np.mean(muse_m13_n2_corr > 0.0)),
+            "muse_m13_n2_oxygen_abundance_significant_run_fraction": float(np.mean((muse_m13_n2_corr > 0.0) & (muse_m13_n2_p < 0.05))),
+            "muse_m13_n2_oxygen_abundance_median_partial_correlation": nanmedian_or_nan(muse_m13_n2_corr),
+            "mean_deep_spec_cluster_members_per_run": float(np.mean(deep_spec_member_counts)),
+            "deep_spec_mass_positive_run_fraction": float(np.mean(deep_spec_mass_corr > 0.0)),
+            "deep_spec_mass_significant_run_fraction": float(np.mean((deep_spec_mass_corr > 0.0) & (deep_spec_mass_p < 0.05))),
+            "deep_spec_mass_median_partial_correlation": nanmedian_or_nan(deep_spec_mass_corr),
+            "deep_spec_local_kappa_positive_run_fraction": float(np.mean(deep_spec_local_kappa_corr > 0.0)),
+            "deep_spec_local_kappa_significant_run_fraction": float(np.mean((deep_spec_local_kappa_corr > 0.0) & (deep_spec_local_kappa_p < 0.05))),
+            "deep_spec_local_kappa_median_partial_correlation": nanmedian_or_nan(deep_spec_local_kappa_corr),
+            "deep_spec_photometric_proxy_positive_run_fraction": float(np.mean(deep_spec_proxy_corr > 0.0)),
+            "deep_spec_photometric_proxy_significant_run_fraction": float(np.mean((deep_spec_proxy_corr > 0.0) & (deep_spec_proxy_p < 0.05))),
+            "deep_spec_photometric_proxy_median_partial_correlation": nanmedian_or_nan(deep_spec_proxy_corr),
+            "deep_spec_muse_line_count_positive_run_fraction": float(np.mean(deep_spec_muse_line_corr > 0.0)),
+            "deep_spec_muse_line_count_significant_run_fraction": float(np.mean((deep_spec_muse_line_corr > 0.0) & (deep_spec_muse_line_p < 0.05))),
+            "deep_spec_muse_line_count_median_partial_correlation": nanmedian_or_nan(deep_spec_muse_line_corr),
+            "deep_spec_muse_optical_complexity_positive_run_fraction": float(np.mean(deep_spec_muse_optical_corr > 0.0)),
+            "deep_spec_muse_optical_complexity_significant_run_fraction": float(np.mean((deep_spec_muse_optical_corr > 0.0) & (deep_spec_muse_optical_p < 0.05))),
+            "deep_spec_muse_optical_complexity_median_partial_correlation": nanmedian_or_nan(deep_spec_muse_optical_corr),
             "random_null_significant_run_fraction": float(np.mean(random_p < 0.05)),
         },
     }
@@ -2437,6 +3154,20 @@ def run_robustness_sweep(
             muse_emission_p = np.asarray([row["muse_emission_strength_partial_p_value"] for row in subset], dtype=float)
             muse_optical_corr = np.asarray([row["muse_optical_complexity_partial_correlation"] for row in subset], dtype=float)
             muse_optical_p = np.asarray([row["muse_optical_complexity_partial_p_value"] for row in subset], dtype=float)
+            muse_r23_corr = np.asarray([row["muse_r23_partial_correlation"] for row in subset], dtype=float)
+            muse_r23_p = np.asarray([row["muse_r23_partial_p_value"] for row in subset], dtype=float)
+            muse_o32_corr = np.asarray([row["muse_o32_partial_correlation"] for row in subset], dtype=float)
+            muse_o32_p = np.asarray([row["muse_o32_partial_p_value"] for row in subset], dtype=float)
+            muse_o3n2_corr = np.asarray([row["muse_o3n2_partial_correlation"] for row in subset], dtype=float)
+            muse_o3n2_p = np.asarray([row["muse_o3n2_partial_p_value"] for row in subset], dtype=float)
+            muse_balmer_corr = np.asarray([row["muse_balmer_decrement_partial_correlation"] for row in subset], dtype=float)
+            muse_balmer_p = np.asarray([row["muse_balmer_decrement_partial_p_value"] for row in subset], dtype=float)
+            muse_n2_corr = np.asarray([row["muse_n2_partial_correlation"] for row in subset], dtype=float)
+            muse_n2_p = np.asarray([row["muse_n2_partial_p_value"] for row in subset], dtype=float)
+            muse_m13_o3n2_corr = np.asarray([row["muse_m13_o3n2_oxygen_abundance_partial_correlation"] for row in subset], dtype=float)
+            muse_m13_o3n2_p = np.asarray([row["muse_m13_o3n2_oxygen_abundance_partial_p_value"] for row in subset], dtype=float)
+            muse_m13_n2_corr = np.asarray([row["muse_m13_n2_oxygen_abundance_partial_correlation"] for row in subset], dtype=float)
+            muse_m13_n2_p = np.asarray([row["muse_m13_n2_oxygen_abundance_partial_p_value"] for row in subset], dtype=float)
             random_p = np.asarray([row["random_null_p_value"] for row in subset], dtype=float)
             summary[f"{cluster_key}:{residual_mode}"] = {
                 "run_count": len(subset),
@@ -2454,20 +3185,48 @@ def run_robustness_sweep(
                 "local_kappa_median_p_value": float(np.median(local_kappa_p)),
                 "photometric_proxy_positive_fraction": float(np.mean(proxy_corr > 0.0)),
                 "photometric_proxy_significant_fraction": float(np.mean((proxy_corr > 0.0) & (proxy_p < 0.05))),
-                "photometric_proxy_median_partial_correlation": float(np.nanmedian(proxy_corr)),
-                "photometric_proxy_median_p_value": float(np.nanmedian(proxy_p)),
+                "photometric_proxy_median_partial_correlation": nanmedian_or_nan(proxy_corr),
+                "photometric_proxy_median_p_value": nanmedian_or_nan(proxy_p),
                 "muse_line_count_positive_fraction": float(np.mean(muse_line_corr > 0.0)),
                 "muse_line_count_significant_fraction": float(np.mean((muse_line_corr > 0.0) & (muse_line_p < 0.05))),
-                "muse_line_count_median_partial_correlation": float(np.nanmedian(muse_line_corr)),
-                "muse_line_count_median_p_value": float(np.nanmedian(muse_line_p)),
+                "muse_line_count_median_partial_correlation": nanmedian_or_nan(muse_line_corr),
+                "muse_line_count_median_p_value": nanmedian_or_nan(muse_line_p),
                 "muse_emission_strength_positive_fraction": float(np.mean(muse_emission_corr > 0.0)),
                 "muse_emission_strength_significant_fraction": float(np.mean((muse_emission_corr > 0.0) & (muse_emission_p < 0.05))),
-                "muse_emission_strength_median_partial_correlation": float(np.nanmedian(muse_emission_corr)),
-                "muse_emission_strength_median_p_value": float(np.nanmedian(muse_emission_p)),
+                "muse_emission_strength_median_partial_correlation": nanmedian_or_nan(muse_emission_corr),
+                "muse_emission_strength_median_p_value": nanmedian_or_nan(muse_emission_p),
                 "muse_optical_complexity_positive_fraction": float(np.mean(muse_optical_corr > 0.0)),
                 "muse_optical_complexity_significant_fraction": float(np.mean((muse_optical_corr > 0.0) & (muse_optical_p < 0.05))),
-                "muse_optical_complexity_median_partial_correlation": float(np.nanmedian(muse_optical_corr)),
-                "muse_optical_complexity_median_p_value": float(np.nanmedian(muse_optical_p)),
+                "muse_optical_complexity_median_partial_correlation": nanmedian_or_nan(muse_optical_corr),
+                "muse_optical_complexity_median_p_value": nanmedian_or_nan(muse_optical_p),
+                "muse_r23_positive_fraction": float(np.mean(muse_r23_corr > 0.0)),
+                "muse_r23_significant_fraction": float(np.mean((muse_r23_corr > 0.0) & (muse_r23_p < 0.05))),
+                "muse_r23_median_partial_correlation": nanmedian_or_nan(muse_r23_corr),
+                "muse_r23_median_p_value": nanmedian_or_nan(muse_r23_p),
+                "muse_o32_positive_fraction": float(np.mean(muse_o32_corr > 0.0)),
+                "muse_o32_significant_fraction": float(np.mean((muse_o32_corr > 0.0) & (muse_o32_p < 0.05))),
+                "muse_o32_median_partial_correlation": nanmedian_or_nan(muse_o32_corr),
+                "muse_o32_median_p_value": nanmedian_or_nan(muse_o32_p),
+                "muse_o3n2_positive_fraction": float(np.mean(muse_o3n2_corr > 0.0)),
+                "muse_o3n2_significant_fraction": float(np.mean((muse_o3n2_corr > 0.0) & (muse_o3n2_p < 0.05))),
+                "muse_o3n2_median_partial_correlation": nanmedian_or_nan(muse_o3n2_corr),
+                "muse_o3n2_median_p_value": nanmedian_or_nan(muse_o3n2_p),
+                "muse_balmer_decrement_positive_fraction": float(np.mean(muse_balmer_corr > 0.0)),
+                "muse_balmer_decrement_significant_fraction": float(np.mean((muse_balmer_corr > 0.0) & (muse_balmer_p < 0.05))),
+                "muse_balmer_decrement_median_partial_correlation": nanmedian_or_nan(muse_balmer_corr),
+                "muse_balmer_decrement_median_p_value": nanmedian_or_nan(muse_balmer_p),
+                "muse_n2_positive_fraction": float(np.mean(muse_n2_corr > 0.0)),
+                "muse_n2_significant_fraction": float(np.mean((muse_n2_corr > 0.0) & (muse_n2_p < 0.05))),
+                "muse_n2_median_partial_correlation": nanmedian_or_nan(muse_n2_corr),
+                "muse_n2_median_p_value": nanmedian_or_nan(muse_n2_p),
+                "muse_m13_o3n2_oxygen_abundance_positive_fraction": float(np.mean(muse_m13_o3n2_corr > 0.0)),
+                "muse_m13_o3n2_oxygen_abundance_significant_fraction": float(np.mean((muse_m13_o3n2_corr > 0.0) & (muse_m13_o3n2_p < 0.05))),
+                "muse_m13_o3n2_oxygen_abundance_median_partial_correlation": nanmedian_or_nan(muse_m13_o3n2_corr),
+                "muse_m13_o3n2_oxygen_abundance_median_p_value": nanmedian_or_nan(muse_m13_o3n2_p),
+                "muse_m13_n2_oxygen_abundance_positive_fraction": float(np.mean(muse_m13_n2_corr > 0.0)),
+                "muse_m13_n2_oxygen_abundance_significant_fraction": float(np.mean((muse_m13_n2_corr > 0.0) & (muse_m13_n2_p < 0.05))),
+                "muse_m13_n2_oxygen_abundance_median_partial_correlation": nanmedian_or_nan(muse_m13_n2_corr),
+                "muse_m13_n2_oxygen_abundance_median_p_value": nanmedian_or_nan(muse_m13_n2_p),
                 "random_null_significant_fraction": float(np.mean(random_p < 0.05)),
             }
 
