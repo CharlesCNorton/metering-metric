@@ -369,6 +369,8 @@ This **convergence-divergence sign flip** is a unique morphological signature. D
 
 This analysis requires no new observations. HST, JWST, and Chandra archival data suffice.
 
+**Initial archival result (2026-03-11):** A real-data pass has now been run on the two public HFF fields with derived galaxy-property catalogs (`Abell 370`, `RXC J2248 / Abell S1063`) using the official HFF property catalogs, matching HFF photometry catalogs, and 22 independent frontier-model `kappa` maps. The convergence-divergence morphology is reproducible across model families, but the stable explanatory axis is stellar mass rather than the proposed decoherence proxies. In the primary two-cluster radial-median analysis, the mass effect combines at Fisher $p \approx 1.0 \times 10^{-4}$. Across the 22 model-family runs, mass is positive in 22/22 and significant in 20/22. Star formation rate is positive and often significant in `Abell 370`, but does not replicate in `RXC J2248 / Abell S1063`. A matched photometric continuum-slope proxy also fails to replicate. The archival lensing test therefore supports a real sign-flip-like morphology, but does not yet support the stronger claim that it tracks complexity proxies rather than mass.
+
 ### GW170817 Compatibility
 
 GW170817/GRB 170817A constrains $|c_{\text{GW}} - c_{\text{photon}}|/c < 10^{-15}$.
@@ -405,6 +407,8 @@ This constitutes a fundamentally new SETI methodology: searching for observers b
 ### E. Void Lensing Residuals (Archival)
 
 The convergence-divergence sign-flip morphology at void boundaries is distinct from any CDM or modified-gravity prediction. Test: lensing residuals in existing cluster surveys, correlated with proxies for information-processing density. Requires no new observations.
+
+An initial cluster-core archival pass is now complete on the two HFF fields with derived galaxy-property catalogs. The morphology itself survives real-data and model-family checks, but the replicated predictor is mass. The next lensing step is therefore sharper residual construction and direct metallicity-capable catalogs, not additional qualitative argument.
 
 ---
 
@@ -472,7 +476,8 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Photon decoupling | Formalized |
 | Decoherence rate source criterion | Formalized |
 | Void metering + cosmological predictions | Complete |
-| Coq formalization | Planned |
+| Archival lensing analysis (2 clusters, 22 model families) | Initial run complete; morphology replicated, mass-linked; proxy signal not established |
+| Coq formalization | Initial abstract theorem development complete; monolithic file compiles |
 | Physical $\alpha$ measurement | Open |
 
 ---

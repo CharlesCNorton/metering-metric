@@ -6,6 +6,18 @@
 .*.aux
 .*.cache
 .nra.cache
+*.pyc
+__pycache__/
+lensing_manifest.json
+toy_lensing/
+abell370_firstpass/
+abell370_firstpass_radial/
+rxcj2248_firstpass/
+combined_firstpass/
+robustness_sweep/
+full_experiment/
+full_experiment_proxy/
+tmp_inputs/
 
 coq/*.vo
 coq/*.vok
