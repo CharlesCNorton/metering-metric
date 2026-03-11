@@ -2,4 +2,4 @@
 -arg -w
 -arg -notation-overridden
 
-MeteringMetricTheorems.v
+meteringmetric.v

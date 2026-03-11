@@ -1,23 +1,19 @@
-(** * MeteringMetricTheorems: Canonical monolithic development *)
+(** * meteringmetric *)
 (**
-   This file is the canonical single-file proof development for the
-   abstract metering-metric theorems. It packages the original split
-   definitions, support lemmas, and theorem files into one monolithic
-   development with a single build target.
+   Abstract theorem package for the metering metric.
 
-   The development proves three families of results under abstract
-   hypotheses on:
+   Hypotheses:
+   - [f : R -> R] is an activation function with [f 0 = 0], continuity,
+     monotonicity on nonnegative inputs, boundedness by [1], and strict
+     positivity on positive inputs.
+   - [mu : R -> R] is a strictly positive continuous metering density
+     that decays to [0] as [x -> +infinity].
 
-   - an activation function [f] with [f 0 = 0], monotonicity, boundedness,
-     continuity, and strict positivity on positive inputs;
-   - a metering density [mu] that is continuous, strictly positive, and
-     decays to zero at spatial infinity.
-
-   Within that abstract setting we prove:
-
-   1. Proper time vanishes where metering vanishes.
+   Main results:
+   1. Proper time vanishes on meterless regions.
    2. The tortoise coordinate is unbounded.
-   3. The effective potential diverges and yields a divergent WKB barrier.
+   3. The effective potential diverges, and the corresponding WKB barrier
+      integral can be made arbitrarily large.
 *)
 
 Require Import Reals.

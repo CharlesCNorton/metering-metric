@@ -1,3 +1,12 @@
+*.vo
+*.vok
+*.vos
+*.glob
+*.aux
+.*.aux
+.*.cache
+.nra.cache
+
 coq/*.vo
 coq/*.vok
 coq/*.vos
