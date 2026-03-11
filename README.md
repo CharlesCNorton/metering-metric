@@ -387,6 +387,16 @@ This convergence-divergence sign flip is the structural clue carried forward fro
 
 The current 3+1D null-geodesic workbench [`three_plus_one_lensing.py`](./three_plus_one_lensing.py) makes the immediate theoretical constraint explicit. Under the mass-term-only photon-decoupling model used in this repository, photons follow the bare metric: the flat decoupled control gives zero direct deflection and zero direct gravitational redshift to numerical precision, while the Schwarzschild control reproduces the weak-field $4M/b$ law at the sub-percent level. A direct metering-induced photon signal therefore requires either an explicit photon-sector completion or a backreaction calculation that feeds the massive-sector metering structure into the metric photons inhabit.
 
+The first explicit backreaction path is now also in that workbench. In its current weak-field toy form, a spherical metering profile sources a photon metric through a positive effective energy density
+
+$$\rho_\mu(r) \propto \frac{1}{2}|\partial_r \mu|^2 + \frac{1}{2}m_\mu^2 \mu^2,$$
+
+which generates a Newtonian potential $\Phi(r)$ and a static photon metric
+
+$$ds_\gamma^2 = -(1 + 2\Phi)dt^2 + (1 - 2\Phi)dr^2 + r^2 d\Omega^2.$$
+
+That is not yet a full covariant completion, but it is a concrete nonzero 3+1D lensing channel that can now be computed and compared against the flat-decoupled control.
+
 **Observational target:** Galaxy cluster lensing residuals. The archival program tests whether the sign-flip-like morphology survives model-family variation and whether any decoherence-relevant proxy carries conditional signal beyond stellar mass and local convergence. That is a morphology-and-confounder program, not yet a completed derivation of a direct photon-sector effect.
 
 The current archival program works on the two public HFF cluster fields (`Abell 370`, `RXC J2248 / Abell S1063`) using the official HFF property catalogs, BUFFALO v2 photometric proxy catalogs, public MUSE Lensing Clusters spectroscopic catalogs, a hardened `radial_median_bandpass` residual construction, deeper external spectroscopy for membership hardening, public `MUSE-DEEP` core-cube extractions, and 22 independent frontier-model `kappa` maps. The sign-flip-like morphology is reproducible across model families, so the observational question is no longer whether the morphology exists in the archive; it is which explanatory axis survives the controls and replicates across clusters.
@@ -454,7 +464,12 @@ Within that program, the hardened residual baseline is now in place, stronger pu
 
 The project now needs the actual lensing observable derived from a consistent 3+1D completion, not further proxy reshuffling on the current public archive. The central task is to write the covariant theory cleanly enough that photon propagation, lensing, and any claimed redshift effect can be computed from the field equations rather than inferred from lower-dimensional geometric intuition.
 
-A concrete workbench for that step now exists in [`three_plus_one_lensing.py`](./three_plus_one_lensing.py). It evaluates null geodesics for static spherical photon metrics, checks the flat-decoupled control, and benchmarks against Schwarzschild. At present that workbench says something sharp: flat photon decoupling yields no direct metering-induced photon deflection or redshift. The next theoretical move is therefore not proxy reshuffling; it is to specify the photon sector or the backreaction channel tightly enough that a nontrivial 3+1D observable can be computed.
+A concrete workbench for that step now exists in [`three_plus_one_lensing.py`](./three_plus_one_lensing.py). It evaluates null geodesics for static spherical photon metrics, checks the flat-decoupled control, benchmarks against Schwarzschild, and now includes a first weak-field backreaction ansatz sourced by the metering profile itself. At present that workbench says two sharp things:
+
+1. flat photon decoupling yields no direct metering-induced photon deflection or redshift;
+2. a weak-field metering backreaction ansatz does yield a computable nonzero photon signal.
+
+The next theoretical move is therefore to replace that toy backreaction ansatz with a derivation from the covariant field equations, or else to write down an explicit photon-sector coupling and test it in the same workbench.
 
 ### The Coupling Constant
 
@@ -540,7 +555,7 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Potential shape discrimination | 6-site hardware comparison complete; $1/N^2$ gives the best fit among tested shapes |
 | Metering field equation (PDE + stability) | Numerical study complete; stable in the tested setups |
 | Photon decoupling | Model consequence of the mass-term-only coupling |
-| 3+1D lensing observable | Null-geodesic workbench in place; flat photon decoupling gives zero direct photon signal; photon-sector/backreaction completion open |
+| 3+1D lensing observable | Null-geodesic workbench in place; flat photon decoupling gives zero direct photon signal; first weak-field backreaction ansatz now computable; full photon-sector/backreaction completion still open |
 | Decoherence rate source criterion | Proposed and computationally explored; not observationally established |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
 | Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; the public-data proxy lane is exhausted without a replicated abundance-style signal; active focus shifts to the 3+1D lensing derivation |

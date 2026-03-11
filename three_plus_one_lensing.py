@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
-from scipy.integrate import quad
+from scipy.integrate import cumulative_trapezoid, quad
 
 
 MetricFn = Callable[[float], float]
@@ -37,6 +37,7 @@ class StaticSphericalPhotonMetric:
     radial_B: MetricFn
     r_min: float
     asymptotic_lapse: float = 1.0
+    metadata: dict[str, float] | None = None
 
 
 def tanh_lapse(mu: float, alpha: float, epsilon: float = 0.0) -> float:
@@ -96,6 +97,94 @@ def toy_photon_coupled_metering_metric(
         radial_B=radial_B,
         r_min=1.0e-6,
         asymptotic_lapse=1.0,
+    )
+
+
+def gaussian_mu_prime(r: float, mu0: float, sigma: float) -> float:
+    return float(-(r / (sigma * sigma)) * gaussian_mu(r, mu0=mu0, sigma=sigma))
+
+
+def metering_energy_density(
+    r: float,
+    mu0: float,
+    sigma: float,
+    screening_mass: float,
+    density_scale: float,
+) -> float:
+    mu_value = gaussian_mu(r, mu0=mu0, sigma=sigma)
+    gradient = gaussian_mu_prime(r, mu0=mu0, sigma=sigma)
+    return float(density_scale * (0.5 * gradient * gradient + 0.5 * screening_mass * screening_mass * mu_value * mu_value))
+
+
+def spherical_newtonian_potential(
+    radii: np.ndarray,
+    density: np.ndarray,
+    gravity_scale: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    shell_density = 4.0 * math.pi * radii * radii * density
+    enclosed_mass = cumulative_trapezoid(shell_density, radii, initial=0.0)
+    tail_density = 4.0 * math.pi * radii * density
+    tail_integral = np.zeros_like(radii)
+    if radii.size > 1:
+        shell_steps = 0.5 * (tail_density[1:] + tail_density[:-1]) * np.diff(radii)
+        tail_integral[:-1] = np.cumsum(shell_steps[::-1])[::-1]
+    safe_radii = np.maximum(radii, 1.0e-12)
+    potential = -gravity_scale * (enclosed_mass / safe_radii + tail_integral)
+    potential -= potential[-1]
+    return potential, enclosed_mass
+
+
+def toy_backreacted_metering_metric(
+    mu0: float,
+    sigma: float,
+    screening_mass: float,
+    density_scale: float,
+    gravity_scale: float,
+    profile_r_max: float,
+    profile_samples: int,
+) -> StaticSphericalPhotonMetric:
+    r_min = 1.0e-4
+    radii = np.geomspace(r_min, profile_r_max, profile_samples)
+    density = np.asarray(
+        [
+            metering_energy_density(
+                float(r),
+                mu0=mu0,
+                sigma=sigma,
+                screening_mass=screening_mass,
+                density_scale=density_scale,
+            )
+            for r in radii
+        ],
+        dtype=float,
+    )
+    potential, enclosed_mass = spherical_newtonian_potential(radii, density, gravity_scale=gravity_scale)
+    lapse_values = np.maximum(1.0 + 2.0 * potential, 1.0e-8)
+    radial_values = np.maximum(1.0 - 2.0 * potential, 1.0e-8)
+
+    def lapse_A(r: float) -> float:
+        return float(np.interp(r, radii, lapse_values, left=lapse_values[0], right=1.0))
+
+    def radial_B(r: float) -> float:
+        return float(np.interp(r, radii, radial_values, left=radial_values[0], right=1.0))
+
+    total_mass = float(enclosed_mass[-1])
+    minimum_lapse = float(np.min(np.sqrt(lapse_values)))
+    scaled_total_mass = float(gravity_scale * total_mass)
+    scaled_compactness = 2.0 * gravity_scale * enclosed_mass / np.maximum(radii, 1.0e-12)
+    return StaticSphericalPhotonMetric(
+        name="toy_backreacted_metering",
+        lapse_A=lapse_A,
+        radial_B=radial_B,
+        r_min=r_min,
+        asymptotic_lapse=1.0,
+        metadata={
+            "effective_mass_integral": total_mass,
+            "gravity_scaled_mass": scaled_total_mass,
+            "minimum_photon_lapse": minimum_lapse,
+            "maximum_compactness_2GM_over_r": float(np.max(scaled_compactness)),
+            "profile_r_max": float(profile_r_max),
+        },
     )
 
 
@@ -264,6 +353,16 @@ def scenario_metric(args: argparse.Namespace) -> StaticSphericalPhotonMetric:
         return flat_decoupled_metric()
     if args.scenario == "schwarzschild":
         return schwarzschild_metric(mass=args.mass)
+    if args.scenario == "toy_backreacted_metering":
+        return toy_backreacted_metering_metric(
+            mu0=args.mu0,
+            sigma=args.sigma,
+            screening_mass=args.screening_mass,
+            density_scale=args.density_scale,
+            gravity_scale=args.gravity_scale,
+            profile_r_max=args.profile_r_max,
+            profile_samples=args.profile_samples,
+        )
     if args.scenario == "toy_photon_coupled_metering":
         return toy_photon_coupled_metering_metric(
             mu0=args.mu0,
@@ -286,6 +385,8 @@ def command_evaluate(args: argparse.Namespace) -> None:
         "coordinate_time": photon_coordinate_time(metric, impact_parameter=args.impact_parameter, r_observer=args.r_max),
         "redshift": static_observer_redshift(metric, r_emit=args.r_emit, r_obs=args.r_obs),
     }
+    if metric.metadata is not None:
+        result["metric_metadata"] = metric.metadata
     print(json.dumps(result, indent=2))
 
 
@@ -305,7 +406,11 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     evaluate = subparsers.add_parser("evaluate", help="Evaluate deflection, time delay, and redshift for a metric.")
-    evaluate.add_argument("--scenario", choices=["flat_decoupled", "schwarzschild", "toy_photon_coupled_metering"], required=True)
+    evaluate.add_argument(
+        "--scenario",
+        choices=["flat_decoupled", "schwarzschild", "toy_photon_coupled_metering", "toy_backreacted_metering"],
+        required=True,
+    )
     evaluate.add_argument("--impact-parameter", type=float, default=50.0)
     evaluate.add_argument("--r-max", type=float, default=5.0e4)
     evaluate.add_argument("--r-emit", type=float, default=10.0)
@@ -315,6 +420,11 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--sigma", type=float, default=100.0)
     evaluate.add_argument("--alpha", type=float, default=5.0)
     evaluate.add_argument("--epsilon", type=float, default=0.05)
+    evaluate.add_argument("--screening-mass", type=float, default=0.05)
+    evaluate.add_argument("--density-scale", type=float, default=1.0e-6)
+    evaluate.add_argument("--gravity-scale", type=float, default=1.0)
+    evaluate.add_argument("--profile-r-max", type=float, default=2.0e3)
+    evaluate.add_argument("--profile-samples", type=int, default=4096)
     evaluate.set_defaults(func=command_evaluate)
 
     benchmark = subparsers.add_parser("benchmark-schwarzschild", help="Check the null-geodesic integral against 4M/b.")
