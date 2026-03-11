@@ -1,0 +1,220 @@
+﻿{
+  "impact_parameter": 960.0,
+  "reference_radius": 960.0,
+  "source_amplitude": 0.001,
+  "source_sigma": 120.0,
+  "screening_mass": 0.05,
+  "density_scale": 1e-06,
+  "gravity_scale": 1.0,
+  "temporal_coupling": 0.02,
+  "radial_coupling": 0.1,
+  "photon_alpha": 1.0,
+  "constraints": [
+    {
+      "scenario": "flat_decoupled",
+      "speed_bound": {
+        "evaluation_radius": "asymptotic",
+        "coordinate_speed": 1.0,
+        "abs_speed_shift_from_c": 0.0,
+        "gw170817_speed_limit": 3e-15,
+        "passes_gw170817_speed": true
+      },
+      "ppn_gamma_audit": {
+        "reference_radius": 960.0,
+        "lapse_A": 1.0,
+        "radial_B": 1.0,
+        "effective_newtonian_potential_U": 0.0,
+        "mapped_to_ppn_gamma": true,
+        "gamma_eff": 1.0,
+        "abs_delta_gamma_from_gr": 0.0,
+        "vlba_gamma_central": 0.9998,
+        "vlba_gamma_sigma": 0.0003,
+        "vlba_sigma_offset": 0.6666666666665934,
+        "passes_vlba_2sigma": true,
+        "cassini_gamma_central": 1.000021,
+        "cassini_gamma_sigma": 2.3e-05,
+        "cassini_sigma_offset": 0.9130434782629895,
+        "passes_cassini_2sigma": true,
+        "gw170817_wep_mw_limit": 5.9e-08,
+        "passes_gw170817_wep_mw": true,
+        "gw170817_wep_virgo_limit": 9e-11,
+        "passes_gw170817_wep_virgo": true
+      },
+      "deflection": {
+        "turning_radius": 959.9999999997424,
+        "deflection_angle_rad": 2.9262281486808206e-10,
+        "deflection_angle_arcsec": 6.0357788212244895e-05,
+        "integration_error_estimate": 1.0306357918546044e-10
+      },
+      "coordinate_time": {
+        "turning_radius": 959.9999999997424,
+        "roundtrip_coordinate_time": 99981.56630025781,
+        "flat_roundtrip_coordinate_time": 99981.56630011738,
+        "excess_roundtrip_time": 1.4042598195374012e-07,
+        "integration_error_estimate": 1.7985004298311583e-06
+      },
+      "redshift": {
+        "frequency_ratio_nu_obs_over_nu_emit": 1.0,
+        "redshift_z": 0.0
+      }
+    },
+    {
+      "scenario": "einstein_scalar_backreaction",
+      "speed_bound": {
+        "evaluation_radius": "asymptotic",
+        "coordinate_speed": 1.0,
+        "abs_speed_shift_from_c": 0.0,
+        "gw170817_speed_limit": 3e-15,
+        "passes_gw170817_speed": true
+      },
+      "ppn_gamma_audit": {
+        "reference_radius": 960.0,
+        "lapse_A": 0.9999961472389537,
+        "radial_B": 1.0000038527717625,
+        "effective_newtonian_potential_U": 1.92638052315397e-06,
+        "mapped_to_ppn_gamma": true,
+        "gamma_eff": 1.000002781435332,
+        "abs_delta_gamma_from_gr": 2.7814353320554375e-06,
+        "vlba_gamma_central": 0.9998,
+        "vlba_gamma_sigma": 0.0003,
+        "vlba_sigma_offset": 0.6759381177734448,
+        "passes_vlba_2sigma": true,
+        "cassini_gamma_central": 1.000021,
+        "cassini_gamma_sigma": 2.3e-05,
+        "cassini_sigma_offset": 0.7921115073040574,
+        "passes_cassini_2sigma": true,
+        "gw170817_wep_mw_limit": 5.9e-08,
+        "passes_gw170817_wep_mw": false,
+        "gw170817_wep_virgo_limit": 9e-11,
+        "passes_gw170817_wep_virgo": false
+      },
+      "deflection": {
+        "turning_radius": 959.998150669747,
+        "deflection_angle_rad": 7.706316889066755e-06,
+        "deflection_angle_arcsec": 1.5895419600020806,
+        "integration_error_estimate": 8.160510466858606e-11
+      },
+      "coordinate_time": {
+        "turning_radius": 959.998150669747,
+        "roundtrip_coordinate_time": 99981.58733380312,
+        "flat_roundtrip_coordinate_time": 99981.56630011738,
+        "excess_roundtrip_time": 0.02103368574171327,
+        "integration_error_estimate": 1.534040149676636e-06
+      },
+      "redshift": {
+        "frequency_ratio_nu_obs_over_nu_emit": 0.9999980736176214,
+        "redshift_z": 1.9263860895346596e-06
+      },
+      "metric_metadata": {
+        "source_amplitude": 0.001,
+        "source_sigma": 120.0,
+        "profile_r_max": 5000.0,
+        "profile_samples": 2048.0,
+        "max_mu": 0.3705010603014383,
+        "max_source": 0.001,
+        "max_field_equation_residual": 3.2834357010283997e-06,
+        "density_scale": 1e-06,
+        "gravity_scale": 1.0,
+        "max_energy_density": 1.715898029387765e-10,
+        "max_radial_pressure": 2.5663843026068465e-35,
+        "max_compactness_2GM_over_r": 1.558446526829561e-05,
+        "minimum_photon_lapse": 0.9999919106958233,
+        "gravity_scaled_mass": 0.0018493230411909811
+      },
+      "interpretation_note": "This branch is GR-derived. Outside the effective source tail it should approach a Schwarzschild exterior with gamma = 1. Local gamma offsets on the Gaussian shoulder are a profile/numerical extraction issue, not a distinct non-GR coupling."
+    },
+    {
+      "scenario": "photon_disformal_metering",
+      "speed_bound": {
+        "evaluation_radius": "asymptotic",
+        "coordinate_speed": 1.0,
+        "abs_speed_shift_from_c": 0.0,
+        "gw170817_speed_limit": 3e-15,
+        "passes_gw170817_speed": true
+      },
+      "ppn_gamma_audit": {
+        "reference_radius": 960.0,
+        "lapse_A": 1.0,
+        "radial_B": 1.0,
+        "effective_newtonian_potential_U": 0.0,
+        "mapped_to_ppn_gamma": true,
+        "gamma_eff": 1.0,
+        "abs_delta_gamma_from_gr": 0.0,
+        "vlba_gamma_central": 0.9998,
+        "vlba_gamma_sigma": 0.0003,
+        "vlba_sigma_offset": 0.6666666666665934,
+        "passes_vlba_2sigma": true,
+        "cassini_gamma_central": 1.000021,
+        "cassini_gamma_sigma": 2.3e-05,
+        "cassini_sigma_offset": 0.9130434782629895,
+        "passes_cassini_2sigma": true,
+        "gw170817_wep_mw_limit": 5.9e-08,
+        "passes_gw170817_wep_mw": true,
+        "gw170817_wep_virgo_limit": 9e-11,
+        "passes_gw170817_wep_virgo": true
+      },
+      "deflection": {
+        "turning_radius": 960.0000000002824,
+        "deflection_angle_rad": -3.2082425605040044e-10,
+        "deflection_angle_arcsec": -6.617475301360467e-05,
+        "integration_error_estimate": 7.177037963136747e-11
+      },
+      "coordinate_time": {
+        "turning_radius": 960.0000000002824,
+        "roundtrip_coordinate_time": 99981.5662999634,
+        "flat_roundtrip_coordinate_time": 99981.56630011738,
+        "excess_roundtrip_time": -1.5398836694657803e-07,
+        "integration_error_estimate": 1.7781296999704044e-06
+      },
+      "redshift": {
+        "frequency_ratio_nu_obs_over_nu_emit": 1.0,
+        "redshift_z": 0.0
+      },
+      "metric_metadata": {
+        "source_amplitude": 0.001,
+        "source_sigma": 120.0,
+        "profile_r_max": 5000.0,
+        "profile_samples": 2048.0,
+        "max_mu": 0.3705010603014383,
+        "max_source": 0.001,
+        "max_field_equation_residual": 3.2834357010283997e-06,
+        "temporal_coupling": 0.02,
+        "radial_coupling": 0.1,
+        "photon_alpha": 1.0,
+        "max_activation": 0.12562055903695307,
+        "minimum_photon_lapse": 0.9987430043906494,
+        "maximum_photon_radial_factor": 1.0000003337106982
+      },
+      "interpretation_note": "This branch is directly constrained by the gamma-based bounds. Surviving parameter space requires radial and temporal couplings to lie on a narrow tuning line set by the solved mu(r) profile at the chosen reference radius."
+    }
+  ],
+  "photon_background_speed_bound": {
+    "background_mu": 0.0,
+    "activation_squared": 0.0,
+    "coordinate_speed": 1.0,
+    "abs_speed_shift_from_c": 0.0,
+    "gw170817_speed_limit": 3e-15,
+    "passes_gw170817_speed": true,
+    "max_temporal_coupling_from_gw170817": Infinity
+  },
+  "microscope_reference": {
+    "eta_central": -1.5e-15,
+    "eta_sigma_combined": 2.745906043549196e-15,
+    "note": "Current photon-side branches are not yet directly mapped to composition-dependent Eotvos ratios."
+  },
+  "photon_branch_required_radial_couplings": {
+    "reference_radius": 960.0,
+    "mu_value": 2.0660590211429858e-13,
+    "mu_prime": -1.0456639564183898e-14,
+    "activation_squared": 4.268599878846313e-26,
+    "required_radial_coupling_gamma_gr": 7.8078447034758875,
+    "required_radial_coupling_vlba_central": 7.806283134535191,
+    "required_radial_coupling_vlba_minus_2sigma": 7.801598427713105,
+    "required_radial_coupling_vlba_plus_2sigma": 7.810967841357277,
+    "required_radial_coupling_cassini_central": 7.80800866821466,
+    "required_radial_coupling_cassini_minus_2sigma": 7.8076495073583,
+    "required_radial_coupling_cassini_plus_2sigma": 7.808367829071021,
+    "required_radial_coupling_gw170817_wep_mw": 7.807845164138725,
+    "required_radial_coupling_gw170817_wep_virgo": 7.807844704178593
+  }
+}

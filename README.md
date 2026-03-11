@@ -483,7 +483,15 @@ A concrete workbench for that step now exists in [`three_plus_one_lensing.py`](.
 2. a field-equation-derived Einstein-backreaction branch yields a computable weak-field photon signal;
 3. an explicit photon-sector coupling branch yields a separate computable nonzero photon signal on the same source profile.
 
-The next theoretical move is no longer to invent a channel. It is to decide which branch belongs in the mainline covariant theory, tie that branch back to the full action cleanly, and constrain its coupling size against the rest of the framework.
+The workbench now also carries a first constraint audit against GW170817-style speed bounds, solar-system light-bending and Shapiro-delay $\gamma$ bounds, and multimessenger weak-equivalence-principle bounds. The result is asymmetric. The explicit photon-sector branch is easy to generate but hard to keep: under the representative weak-field profile now in the repository, the default direct-coupling choice fails the VLBA, Cassini, and GW170817 $\Delta\gamma$ tests by orders of magnitude. Surviving parameter space is not broad; it lies on a narrow tuning line relating the temporal and radial photon couplings. In the current audit at reference radius $r = 360$ for the default sourced profile, a temporal coupling of `0.02` requires a radial coupling near `35.95` to land at $\gamma \approx 1$, while the current illustrative value `0.1` is far outside that allowed band.
+
+GW170817 is also sharp about asymptotic background coupling. For a homogeneous nonzero metering background $\mu_\infty$, the direct photon branch picks up an asymptotic speed shift unless the temporal coupling is extremely small. In the current audit code this appears as
+
+$$\zeta_{\max} \sim \frac{2\,\delta c_{\max}}{\tanh^2(\alpha_\gamma \mu_\infty)},$$
+
+with $\delta c_{\max} \sim 3 \times 10^{-15}$. Even a tiny background such as $\mu_\infty = 10^{-3}$ drives the allowed temporal coupling down to order `6e-9`.
+
+The Einstein-backreaction branch is in better shape. In the exterior it is a GR-derived branch and should relax to Schwarzschild with $\gamma = 1$. The present audit reproduces that trend in the far field; the residual local offsets seen on the Gaussian shoulder are a numerical/profile-extraction issue rather than evidence of a new non-GR coupling. The next theoretical move is therefore no longer to invent a channel. It is to decide which branch belongs in the mainline covariant theory, tie that branch back to the full action cleanly, and constrain its coupling size against the rest of the framework.
 
 ### The Coupling Constant
 

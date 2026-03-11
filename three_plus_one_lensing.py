@@ -31,6 +31,17 @@ from scipy.integrate import IntegrationWarning, cumulative_trapezoid, quad
 MetricFn = Callable[[float], float]
 
 
+GW170817_SPEED_LIMIT = 3.0e-15
+VLBA_GAMMA_CENTRAL = 0.9998
+VLBA_GAMMA_SIGMA = 3.0e-4
+CASSINI_GAMMA_CENTRAL = 1.0 + 2.1e-5
+CASSINI_GAMMA_SIGMA = 2.3e-5
+GW170817_WEP_DELTA_GAMMA_MW = 5.9e-8
+GW170817_WEP_DELTA_GAMMA_VIRGO = 0.9e-10
+MICROSCOPE_ETA_CENTRAL = -1.5e-15
+MICROSCOPE_ETA_SIGMA = math.sqrt((2.3e-15) ** 2 + (1.5e-15) ** 2)
+
+
 @dataclass(frozen=True)
 class StaticSphericalPhotonMetric:
     name: str
@@ -302,7 +313,8 @@ def einstein_scalar_backreaction_metric(
     phi_prime = (mass_function + 4.0 * math.pi * gravity_scale * radii * radii * radii * radial_pressure) / denominator
     phi_prime[0] = 0.0
     phi = -reverse_cumulative_trapezoid(phi_prime, radii)
-    phi -= phi[-1]
+    exterior_boundary_phi = 0.5 * math.log(max(1.0 - (2.0 * mass_function[-1] / max(radii[-1], 1.0e-10)), 1.0e-12))
+    phi = phi - phi[-1] + exterior_boundary_phi
 
     lapse_values = np.maximum(np.exp(2.0 * phi), 1.0e-8)
     radial_values = 1.0 / np.maximum(1.0 - compactness, 1.0e-8)
@@ -560,6 +572,136 @@ def weak_field_schwarzschild_benchmark(mass: float, impact_parameter: float, r_m
     }
 
 
+def asymptotic_speed_delta(metric: StaticSphericalPhotonMetric) -> dict:
+    speed = math.sqrt(metric.asymptotic_lapse)
+    delta = abs(speed - 1.0)
+    return {
+        "evaluation_radius": "asymptotic",
+        "coordinate_speed": speed,
+        "abs_speed_shift_from_c": delta,
+        "gw170817_speed_limit": GW170817_SPEED_LIMIT,
+        "passes_gw170817_speed": delta <= GW170817_SPEED_LIMIT,
+    }
+
+
+def effective_ppn_gamma(metric: StaticSphericalPhotonMetric, reference_radius: float) -> dict:
+    lapse = metric.lapse_A(reference_radius)
+    radial = metric.radial_B(reference_radius)
+    delta_a = 1.0 - lapse
+    delta_b = radial - 1.0
+    if abs(delta_a) < 1.0e-18 and abs(delta_b) < 1.0e-18:
+        gamma_eff = 1.0
+        potential_u = 0.0
+        mapped = True
+    elif delta_a <= 0.0:
+        gamma_eff = float("nan")
+        potential_u = -0.5 * delta_a
+        mapped = False
+    else:
+        gamma_eff = delta_b / delta_a
+        potential_u = 0.5 * delta_a
+        mapped = True
+
+    payload = {
+        "reference_radius": reference_radius,
+        "lapse_A": lapse,
+        "radial_B": radial,
+        "effective_newtonian_potential_U": potential_u,
+        "mapped_to_ppn_gamma": mapped,
+        "gamma_eff": gamma_eff,
+    }
+    if mapped:
+        delta_gamma = abs(gamma_eff - 1.0)
+        payload.update(
+            {
+                "abs_delta_gamma_from_gr": delta_gamma,
+                "vlba_gamma_central": VLBA_GAMMA_CENTRAL,
+                "vlba_gamma_sigma": VLBA_GAMMA_SIGMA,
+                "vlba_sigma_offset": abs(gamma_eff - VLBA_GAMMA_CENTRAL) / VLBA_GAMMA_SIGMA,
+                "passes_vlba_2sigma": abs(gamma_eff - VLBA_GAMMA_CENTRAL) <= 2.0 * VLBA_GAMMA_SIGMA,
+                "cassini_gamma_central": CASSINI_GAMMA_CENTRAL,
+                "cassini_gamma_sigma": CASSINI_GAMMA_SIGMA,
+                "cassini_sigma_offset": abs(gamma_eff - CASSINI_GAMMA_CENTRAL) / CASSINI_GAMMA_SIGMA,
+                "passes_cassini_2sigma": abs(gamma_eff - CASSINI_GAMMA_CENTRAL) <= 2.0 * CASSINI_GAMMA_SIGMA,
+                "gw170817_wep_mw_limit": GW170817_WEP_DELTA_GAMMA_MW,
+                "passes_gw170817_wep_mw": delta_gamma <= GW170817_WEP_DELTA_GAMMA_MW,
+                "gw170817_wep_virgo_limit": GW170817_WEP_DELTA_GAMMA_VIRGO,
+                "passes_gw170817_wep_virgo": delta_gamma <= GW170817_WEP_DELTA_GAMMA_VIRGO,
+            }
+        )
+    return payload
+
+
+def photon_branch_required_radial_couplings(
+    source_amplitude: float,
+    source_sigma: float,
+    screening_mass: float,
+    temporal_coupling: float,
+    photon_alpha: float,
+    reference_radius: float,
+    profile_r_max: float,
+    profile_samples: int,
+) -> dict:
+    profile = solve_screened_poisson_profile(
+        source_amplitude=source_amplitude,
+        source_sigma=source_sigma,
+        screening_mass=screening_mass,
+        profile_r_max=profile_r_max,
+        profile_samples=profile_samples,
+    )
+    mu_value = float(np.interp(reference_radius, profile.radii, profile.mu, left=profile.mu[1], right=profile.mu[-1]))
+    mu_prime_value = float(np.interp(reference_radius, profile.radii, profile.mu_prime, left=profile.mu_prime[1], right=profile.mu_prime[-1]))
+    activation_sq = math.tanh(photon_alpha * mu_value) ** 2
+    slope_sq = mu_prime_value * mu_prime_value
+    if slope_sq <= 0.0:
+        return {
+            "reference_radius": reference_radius,
+            "mu_value": mu_value,
+            "mu_prime": mu_prime_value,
+            "activation_squared": activation_sq,
+            "required_radial_coupling_gamma_gr": float("nan"),
+        }
+
+    def coupling_for_gamma(target_gamma: float) -> float:
+        return target_gamma * temporal_coupling * activation_sq / slope_sq
+
+    return {
+        "reference_radius": reference_radius,
+        "mu_value": mu_value,
+        "mu_prime": mu_prime_value,
+        "activation_squared": activation_sq,
+        "required_radial_coupling_gamma_gr": coupling_for_gamma(1.0),
+        "required_radial_coupling_vlba_central": coupling_for_gamma(VLBA_GAMMA_CENTRAL),
+        "required_radial_coupling_vlba_minus_2sigma": coupling_for_gamma(VLBA_GAMMA_CENTRAL - 2.0 * VLBA_GAMMA_SIGMA),
+        "required_radial_coupling_vlba_plus_2sigma": coupling_for_gamma(VLBA_GAMMA_CENTRAL + 2.0 * VLBA_GAMMA_SIGMA),
+        "required_radial_coupling_cassini_central": coupling_for_gamma(CASSINI_GAMMA_CENTRAL),
+        "required_radial_coupling_cassini_minus_2sigma": coupling_for_gamma(CASSINI_GAMMA_CENTRAL - 2.0 * CASSINI_GAMMA_SIGMA),
+        "required_radial_coupling_cassini_plus_2sigma": coupling_for_gamma(CASSINI_GAMMA_CENTRAL + 2.0 * CASSINI_GAMMA_SIGMA),
+        "required_radial_coupling_gw170817_wep_mw": coupling_for_gamma(1.0 + GW170817_WEP_DELTA_GAMMA_MW),
+        "required_radial_coupling_gw170817_wep_virgo": coupling_for_gamma(1.0 + GW170817_WEP_DELTA_GAMMA_VIRGO),
+    }
+
+
+def photon_background_speed_bound(background_mu: float, temporal_coupling: float, photon_alpha: float) -> dict:
+    activation_sq = math.tanh(photon_alpha * background_mu) ** 2
+    lapse = max(1.0 - temporal_coupling * activation_sq, 1.0e-18)
+    speed = math.sqrt(lapse)
+    delta = abs(speed - 1.0)
+    if activation_sq == 0.0:
+        max_temporal = float("inf")
+    else:
+        max_temporal = (2.0 * GW170817_SPEED_LIMIT) / activation_sq
+    return {
+        "background_mu": background_mu,
+        "activation_squared": activation_sq,
+        "coordinate_speed": speed,
+        "abs_speed_shift_from_c": delta,
+        "gw170817_speed_limit": GW170817_SPEED_LIMIT,
+        "passes_gw170817_speed": delta <= GW170817_SPEED_LIMIT,
+        "max_temporal_coupling_from_gw170817": max_temporal,
+    }
+
+
 def scenario_metric(args: argparse.Namespace) -> StaticSphericalPhotonMetric:
     if args.scenario == "flat_decoupled":
         return flat_decoupled_metric()
@@ -674,6 +816,87 @@ def command_compare_completions(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def command_constraint_audit(args: argparse.Namespace) -> None:
+    reference_radius = args.reference_radius if args.reference_radius is not None else max(args.impact_parameter, args.source_sigma)
+    flat_metric = flat_decoupled_metric()
+    einstein_metric = einstein_scalar_backreaction_metric(
+        source_amplitude=args.source_amplitude,
+        source_sigma=args.source_sigma,
+        screening_mass=args.screening_mass,
+        density_scale=args.density_scale,
+        gravity_scale=args.gravity_scale,
+        profile_r_max=args.profile_r_max,
+        profile_samples=args.profile_samples,
+    )
+    photon_metric = photon_disformal_metering_metric(
+        source_amplitude=args.source_amplitude,
+        source_sigma=args.source_sigma,
+        screening_mass=args.screening_mass,
+        temporal_coupling=args.temporal_coupling,
+        radial_coupling=args.radial_coupling,
+        photon_alpha=args.photon_alpha,
+        profile_r_max=args.profile_r_max,
+        profile_samples=args.profile_samples,
+    )
+    metrics = [flat_metric, einstein_metric, photon_metric]
+    result = {
+        "impact_parameter": args.impact_parameter,
+        "reference_radius": reference_radius,
+        "source_amplitude": args.source_amplitude,
+            "source_sigma": args.source_sigma,
+            "screening_mass": args.screening_mass,
+            "density_scale": args.density_scale,
+            "gravity_scale": args.gravity_scale,
+            "temporal_coupling": args.temporal_coupling,
+            "radial_coupling": args.radial_coupling,
+            "photon_alpha": args.photon_alpha,
+        "constraints": [],
+        "photon_background_speed_bound": photon_background_speed_bound(
+            background_mu=args.background_mu,
+            temporal_coupling=args.temporal_coupling,
+            photon_alpha=args.photon_alpha,
+        ),
+        "microscope_reference": {
+            "eta_central": MICROSCOPE_ETA_CENTRAL,
+            "eta_sigma_combined": MICROSCOPE_ETA_SIGMA,
+            "note": "Current photon-side branches are not yet directly mapped to composition-dependent Eotvos ratios.",
+        },
+        "photon_branch_required_radial_couplings": photon_branch_required_radial_couplings(
+            source_amplitude=args.source_amplitude,
+            source_sigma=args.source_sigma,
+            screening_mass=args.screening_mass,
+            temporal_coupling=args.temporal_coupling,
+            photon_alpha=args.photon_alpha,
+            reference_radius=reference_radius,
+            profile_r_max=args.profile_r_max,
+            profile_samples=args.profile_samples,
+        ),
+    }
+    for metric in metrics:
+        payload = {
+            "scenario": metric.name,
+            "speed_bound": asymptotic_speed_delta(metric),
+            "ppn_gamma_audit": effective_ppn_gamma(metric, reference_radius=reference_radius),
+            "deflection": photon_deflection_angle(metric, impact_parameter=args.impact_parameter, r_max=args.r_max),
+            "coordinate_time": photon_coordinate_time(metric, impact_parameter=args.impact_parameter, r_observer=args.r_max),
+            "redshift": static_observer_redshift(metric, r_emit=args.r_emit, r_obs=args.r_obs),
+        }
+        if metric.metadata is not None:
+            payload["metric_metadata"] = metric.metadata
+        if metric.name == "einstein_scalar_backreaction":
+            payload["interpretation_note"] = (
+                "This branch is GR-derived. Outside the effective source tail it should approach a Schwarzschild exterior with gamma = 1. "
+                "Local gamma offsets on the Gaussian shoulder are a profile/numerical extraction issue, not a distinct non-GR coupling."
+            )
+        if metric.name == "photon_disformal_metering":
+            payload["interpretation_note"] = (
+                "This branch is directly constrained by the gamma-based bounds. Surviving parameter space requires radial and temporal "
+                "couplings to lie on a narrow tuning line set by the solved mu(r) profile at the chosen reference radius."
+            )
+        result["constraints"].append(payload)
+    print(json.dumps(result, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Evaluate 3+1D photon observables for static spherical metrics.",
@@ -736,6 +959,25 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--profile-r-max", type=float, default=2.0e3)
     compare.add_argument("--profile-samples", type=int, default=4096)
     compare.set_defaults(func=command_compare_completions)
+
+    audit = subparsers.add_parser("constraint-audit", help="Audit the branches against GW170817, VLBA, Cassini, and WEP-style bounds.")
+    audit.add_argument("--impact-parameter", type=float, default=120.0)
+    audit.add_argument("--r-max", type=float, default=5.0e4)
+    audit.add_argument("--r-emit", type=float, default=120.0)
+    audit.add_argument("--r-obs", type=float, default=5.0e4)
+    audit.add_argument("--reference-radius", type=float, default=None)
+    audit.add_argument("--source-amplitude", type=float, default=1.0e-3)
+    audit.add_argument("--source-sigma", type=float, default=120.0)
+    audit.add_argument("--screening-mass", type=float, default=0.05)
+    audit.add_argument("--density-scale", type=float, default=1.0e-6)
+    audit.add_argument("--gravity-scale", type=float, default=1.0)
+    audit.add_argument("--temporal-coupling", type=float, default=0.02)
+    audit.add_argument("--radial-coupling", type=float, default=0.1)
+    audit.add_argument("--photon-alpha", type=float, default=1.0)
+    audit.add_argument("--background-mu", type=float, default=0.0)
+    audit.add_argument("--profile-r-max", type=float, default=5.0e3)
+    audit.add_argument("--profile-samples", type=int, default=4096)
+    audit.set_defaults(func=command_constraint_audit)
 
     return parser
 
