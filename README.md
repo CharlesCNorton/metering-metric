@@ -4,7 +4,7 @@
 
 A scalar field representing metering density couples to the field Lagrangian as a position-dependent mass term, producing a spacetime geometry in which temporal dynamics are energetically forbidden in regions devoid of metering subsystems. The manifold exists, but nothing elapses.
 
-This is not a restatement of relational time. It is a specific, computable coupling mechanism with three provable structural theorems, a confirmed spectral signature on quantum hardware, and falsifiable cosmological predictions.
+This is not a restatement of relational time. It is a specific coupling proposal with an abstract theorem development, lattice-model spectral evidence, and falsifiable cosmological predictions.
 
 **Author:** Charles C. Norton
 
@@ -12,6 +12,7 @@ This is not a restatement of relational time. It is a specific, computable coupl
 
 ## Table of Contents
 
+- [Evidence Boundary](#evidence-boundary)
 - [Framework](#framework)
 - [Core Theorems](#core-theorems)
 - [The Metering Source](#the-metering-source)
@@ -35,6 +36,18 @@ This is not a restatement of relational time. It is a specific, computable coupl
 
 ---
 
+## Evidence Boundary
+
+This repository mixes several different kinds of support, and they should not be conflated:
+
+- **Coq-formalized:** the root file [`meteringmetric.v`](./meteringmetric.v) currently formalizes the abstract real-analysis skeleton of the framework: proper-time vanishing, tortoise-coordinate divergence, and a WKB-style confinement barrier theorem under stated hypotheses on the activation function and metering profile.
+- **Computationally checked:** the lattice, PDE, and cosmology sections are supported by numerical experiments and symbolic derivations, not by formal proof.
+- **Hardware-backed:** the IBM Quantum section is evidence for discrete bound-state structure in the tested lattice model, not a direct measurement of the physical spacetime coupling constant.
+- **Archival observationally tested:** the cluster-lensing section now has an initial archive run on two HFF fields and 22 independent lens-model families. That run finds a reproducible morphology, but the replicated explanatory axis is mass, not the proposed complexity proxies.
+- **Still speculative:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies rather than mass remain open.
+
+---
+
 ## Framework
 
 ### Intellectual Context
@@ -47,7 +60,7 @@ The framework draws on five established programs, each of which stops short of t
 - **Barbour (1999):** Time can be eliminated from the fundamental description, replaced by relations between configurations.
 - **Bridgman (1927):** A quantity without a measurement procedure is undefined. Unmeasured duration is not duration.
 
-None of these produces a modified spacetime geometry, a horizon, or a testable spectral prediction. This work does.
+None of these produces the specific mass-term coupling proposed here. This work develops that proposal into a concrete analytic and computational program.
 
 ### The Metric
 
@@ -74,7 +87,7 @@ The original approach (v1) attempted to implement conditional duration via the l
 
 ## Core Theorems
 
-Three structural results hold for **any** monotone activation function $f$ (tanh, sigmoid, arctan, erf) and **any** metering profile $\mu$ that decays to zero (Gaussian, top-hat, power-law, double-Gaussian). They are dimension-independent (verified in 1+1D, 2+1D, 3+1D).
+Three structural results motivate the framework for **any** monotone activation function $f$ (tanh, sigmoid, arctan, erf) and **any** metering profile $\mu$ that decays to zero (Gaussian, top-hat, power-law, double-Gaussian). Their abstract analytic skeleton is formalized in Coq, while the dimensional extensions discussed here are computational rather than machine-checked.
 
 ### Theorem 1: Horizon Formation
 
@@ -94,7 +107,7 @@ The effective potential $V_{\text{eff}}(x) = 1/N(x)^2$ confines temporal oscilla
 
 - $V_{\text{eff}} \to \infty$ as $\mu \to 0$ (the potential is confining)
 - The spectrum is purely discrete (only bound states exist)
-- WKB tunneling probability: $\exp(-3218) \approx 0$ (exact machine zero)
+- In the representative WKB estimate used here, the tunneling probability is numerically negligible: $\exp(-3218)$
 - The metered region supports a finite number of bound states: ~69 radial modes (1+1D), ~600 modes (1000-site continuum), ~17 bits (3+1D with angular modes)
 
 The temporal Hilbert space is finite-dimensional and bounded by the metering geometry.
@@ -111,7 +124,13 @@ For a worldline passing through a region where $\mu = 0$ on an interval $[t_1, t
 
 ### Formal Verification
 
-A Coq formalization plan targets machine-checked proofs of all three theorems using the Coquelicot real analysis library. Theorem 3 is straightforward (~50-100 lines). Theorem 1 requires improper integral machinery (~200-400 lines). Theorem 2 uses the WKB approach to prove confinement without full spectral theory (~300-600 lines).
+A Coq development is now present in the root file [`meteringmetric.v`](./meteringmetric.v). It compiles locally against Coquelicot and establishes the abstract theorem spine used in this repository:
+
+- proper-time vanishing in meterless regions
+- unbounded tortoise-coordinate growth
+- a WKB-style confinement barrier result under the stated decay and positivity hypotheses
+
+What it does **not** yet provide is a full formalization of the README's physical superstructure. The numerical dimension-specific counts, PDE dynamics, hardware interpretation, and cosmological phenomenology remain computational or interpretive results rather than machine-checked theorems.
 
 ---
 
@@ -172,7 +191,7 @@ This is a species-dependent metric -- a bimetric structure. The conditional temp
 
 ### What This Preserves
 
-Temporal horizons, mode confinement, bounded temporal information, self-reinforcing horizons, geometric SETI signatures, and WEC violation structure are all unchanged. Photon propagation through voids is restored. GW170817 is automatically satisfied.
+Temporal horizons, mode confinement, bounded temporal information, self-reinforcing horizons, geometric SETI signatures, and WEC violation structure are all unchanged within the model. Photon propagation through voids is restored. Under this mass-term-only coupling, the GW170817 constraint is satisfied.
 
 ### What This Costs
 
@@ -221,7 +240,7 @@ Error limited by 48-point time series resolution ($\Delta\omega = 0.87$).
 | 3.1416 | $E_{167} - E_{30} = 3.1406$ | 0.033% |
 | 3.9270 | $E_{177} - E_0 = 3.9269$ | 0.003% |
 
-Every peak matches to better than **0.06%**. This is two orders of magnitude tighter than the 6-qubit result, ruling out discretization artifacts. The bound-state structure is a property of the $1/N^2$ potential in the continuum limit.
+Every peak matches to better than **0.06%**. This is two orders of magnitude tighter than the 6-qubit result and is consistent with convergence toward a continuum bound-state structure for the tested $1/N^2$ potential.
 
 ### IBM Quantum Hardware
 
@@ -236,7 +255,7 @@ Dense sampling of the descent phase. Hardware tracks noiseless simulator within 
 **Run 3** (20 circuits, $t = 0.30$--$2.50$, Job `d6e3l9vg4t5c7387b93g`):
 Independent confirmation. Minimum $P = 0.15$ at $t = 1.23$, revival to $P = 0.28$ at $t = 1.57$, second descent to $P = 0.16$ at $t = 2.38$.
 
-The oscillatory revival structure -- descent, minimum, revival, second descent -- is **reproduced across two independent submissions** with different circuit constructions. This rules out generic Zeno freezing (which predicts monotonic decay) and confirms bound-state spectral structure.
+The oscillatory revival structure -- descent, minimum, revival, second descent -- is **reproduced across two independent submissions** with different circuit constructions. Within the tested lattice model, this argues against generic monotonic Zeno freezing and supports a bound-state spectral interpretation.
 
 ### Potential Shape Discrimination
 
@@ -251,10 +270,10 @@ Chi-squared fitting of hardware data against five potential shapes, each matched
 | Linear ($|x|$) | 7624 | 14769 | 4th |
 
 **Discrimination ratios:**
-- $1/N^2$ vs. quartic: **1.8--2.1x** (nearest competitor rejected)
+- $1/N^2$ vs. quartic: **1.8--2.1x** (nearest competitor by $\chi^2$ in this test)
 - $1/N^2$ vs. harmonic: **6--15x**
 
-The $1/N^2$ potential is preferred over all alternatives at 6 sites with ~15% hardware noise. The key discriminant is the potential's behavior at intermediate sites: $1/N^2$ gives $V = 3.41$ where quartic gives $V = 3.77$ and harmonic gives $V = 7.21$. The steep walls of the $1/N^2$ potential (rapid transition from low to high $V$) distinguish it from smoother shapes.
+In this 6-site hardware comparison, the $1/N^2$ potential gives the best fit among the tested alternatives. The key discriminant is the potential's behavior at intermediate sites: $1/N^2$ gives $V = 3.41$ where quartic gives $V = 3.77$ and harmonic gives $V = 7.21$. The steep walls of the $1/N^2$ potential (rapid transition from low to high $V$) distinguish it from smoother shapes.
 
 ### Coupling Constant Constraints
 
@@ -266,7 +285,7 @@ Three independent constraints on the coupling constant $\alpha$:
 
 **3. Dimensional analysis:** In SI units, $\alpha_{\text{SI}} \sim \ell_P^3 \sim 4 \times 10^{-105}$ m$^3$/bit. In a laboratory ($\mu \sim 10^{26}$ bits/m$^3$): $\alpha_{\text{SI}} \cdot \mu \sim 4 \times 10^{-79}$.
 
-**Interpretation:** The hardware test confirms the mathematical structure -- bound states in a $1/N^2$ potential exist and have the predicted spectrum. But the lattice encodes $\alpha$ in circuit parameters. The physical coupling constant is not directly measured by this experiment. Constraining the physical $\alpha$ requires experiments where $\mu$ arises naturally (Casimir anomaly, cosmological signatures, gravitational lensing residuals).
+**Interpretation:** The hardware test supports the lattice-model claim that a $1/N^2$ potential can produce the observed bound-state spectral structure. But the lattice encodes $\alpha$ in circuit parameters. The physical coupling constant is not directly measured by this experiment. Constraining the physical $\alpha$ requires experiments where $\mu$ arises naturally (Casimir anomaly, cosmological signatures, gravitational lensing residuals).
 
 ---
 
@@ -297,15 +316,15 @@ This is the screened Poisson equation. The screening length $\ell_s = 1/m$ deter
 Solved on grids of 200 and 1000 points with full nonlinear PDE evolution:
 
 - **Stability:** All linearized eigenvalues $\leq 0$. Zero unstable modes. Horizons are stable.
-- **Convergence:** Nonlinear PDE evolution from 5% of steady state converges to within 2.4% of the analytic steady state by $t = 200$.
+- **Convergence:** In the tested nonlinear PDE runs, evolution from 5% of steady state converges to within 2.4% of the analytic steady state by $t = 200$.
 - **Interior perturbations:** Oscillatory decay (dynamical modes in the metered region).
 - **Boundary perturbations:** Frozen. Perturbations at the horizon do not propagate. Eigenfrequencies scale with $N \to 0$.
 - **Self-reinforcing horizons:** Signal crossing time through an unmetered gap scales as $\sim \epsilon^{-0.94}$ (theory: $\epsilon^{-1}$). As the gap minimum $N \to 0$, crossing time $\to \infty$.
-- **Self-consistent coupling:** Matter-metering feedback converges in ~30--55 iterations. The self-consistent spectrum has higher energies than the prescribed case (narrower effective well), confirming backreaction.
+- **Self-consistent coupling:** Matter-metering feedback converges in ~30--55 iterations in the tested solver. The self-consistent spectrum has higher energies than the prescribed case (narrower effective well), consistent with backreaction.
 
 ### Potential Selection
 
-The **free massive potential** $V(\mu) = m^2 \mu^2 / 2$ is the correct choice. It produces $\mu \to 0$ in voids (horizons form) and is consistent with the decoherence criterion: if there are no decoherence events ($J = 0$), there should be no metering ($\mu = 0$).
+The **free massive potential** $V(\mu) = m^2 \mu^2 / 2$ is the choice adopted in the current model. It produces $\mu \to 0$ in voids (horizons form) and is consistent with the decoherence criterion: if there are no decoherence events ($J = 0$), there should be no metering ($\mu = 0$).
 
 The **symmetry-breaking potential** $V(\mu) = -a\mu^2 + b\mu^4$ has a nonzero vacuum expectation value, giving $\mu > 0$ everywhere including true vacuum. This contradicts the framework's premise, kills horizons, and reduces the bound-state count from hundreds to 2--5.
 
@@ -321,7 +340,7 @@ Key numbers:
 - Density contrast: $\rho_{\text{cl}} / \rho_{\text{void}} = 1429$
 - Source contrast: $J_{\text{cl}} / J_{\text{void}} = 1.1 \times 10^7$
 
-The framework predicts a **sharp phase transition** in the void interior as a function of the screening mass $m$ and coupling $\alpha$. The controlling parameter is $m \cdot R_{\text{void}}$:
+In the numerical void study, the interior shows a **sharp transition** as a function of the screening mass $m$ and coupling $\alpha$. The controlling parameter is $m \cdot R_{\text{void}}$:
 
 | $m \cdot R_{\text{void}}$ | Behavior |
 |---------------------------|----------|
@@ -334,7 +353,7 @@ The framework predicts a **sharp phase transition** in the void interior as a fu
 - Horizon-forming ($N_{\text{void}} < 10^{-3}$): **68 / 120** parameter points (57%)
 - At the strictest threshold ($N_{\text{void}} < 10^{-6}$): horizons exist for $m \gtrsim 0.36$ Mpc$^{-1}$ at all tested $\alpha$, and never for $m \lesssim 0.17$ Mpc$^{-1}$
 
-The transition is sharp -- not a gradual interpolation, but a topological change in causal structure. This is the framework working as designed: the tortoise integral either converges (no horizon) or diverges (horizon), with no intermediate state.
+Within the studied sweep, the transition is sharp rather than gradual: the tortoise integral numerically separates into horizon-forming and non-horizon-forming regimes.
 
 ### Neutrino-Photon Timing Delay
 
@@ -352,9 +371,9 @@ Selected predictions for a 120 Mpc void:
 | 0.20 | 10.0 | $8 \times 10^{-4}$ | 64 Gyr |
 | $\geq 0.50$ | any | $< 10^{-6}$ | effectively infinite |
 
-The delay is **binary rather than continuous**: either $N_{\text{void}} \approx 1$ (no interesting delay) or $N_{\text{void}} \ll 1$ (delay exceeds the age of the universe). The detectable window -- delay $> 10$ ns but finite -- is narrow, sitting near the phase boundary.
+Over the studied parameter range, the delay appears **binary rather than continuous**: either $N_{\text{void}} \approx 1$ (no interesting delay) or $N_{\text{void}} \ll 1$ (delay exceeds the age of the universe). The detectable window -- delay $> 10$ ns but finite -- is narrow, sitting near the phase boundary.
 
-This is not a flaw but a prediction: the effect is a phase transition, and phase transitions are sharp.
+In this model, that sharpness is a consequence of the phase-transition-like behavior of the void solution.
 
 ### Differential Gravitational Lensing
 
@@ -375,7 +394,7 @@ This analysis requires no new observations. HST, JWST, and Chandra archival data
 
 GW170817/GRB 170817A constrains $|c_{\text{GW}} - c_{\text{photon}}|/c < 10^{-15}$.
 
-Since the metering coupling enters through the mass term, all massless fields (photons, gravitons, gluons) decouple. Gravitational waves propagate at $c$ everywhere, regardless of $\mu$. The constraint is **automatically satisfied** for any $(m, \alpha)$. No parameter tuning required.
+Since the metering coupling enters through the mass term, all massless fields (photons, gravitons, gluons) decouple. Gravitational waves propagate at $c$ everywhere, regardless of $\mu$. Within this mass-term-only coupling model, the GW170817 constraint is satisfied for any $(m, \alpha)$, with no parameter tuning required.
 
 ---
 
@@ -402,11 +421,11 @@ If metering density modifies spacetime geometry, regions containing observers ha
 - **Thermal halo:** The analog Unruh temperature at the metering boundary peaks at a characteristic value set by the metering gradient.
 - **Correlation signature:** A true metering signal shows correlated anomalies across all three channels (lensing, redshift, thermal). False positives from unrelated astrophysics do not produce this correlation.
 
-This constitutes a fundamentally new SETI methodology: searching for observers by their geometric imprint on spacetime, not by engineering artifacts or communication attempts.
+If any of these channels proved real, they would suggest a new SETI-style methodology: searching for observers by their geometric imprint on spacetime, not by engineering artifacts or communication attempts.
 
 ### E. Void Lensing Residuals (Archival)
 
-The convergence-divergence sign-flip morphology at void boundaries is distinct from any CDM or modified-gravity prediction. Test: lensing residuals in existing cluster surveys, correlated with proxies for information-processing density. Requires no new observations.
+The convergence-divergence sign-flip morphology at void boundaries is proposed here as a structural signature that differs from standard CDM subhalo convergence patterns and from simple amplitude-only modified-gravity distortions. Test: lensing residuals in existing cluster surveys, correlated with proxies for information-processing density. Requires no new observations.
 
 An initial cluster-core archival pass is now complete on the two HFF fields with derived galaxy-property catalogs. The morphology itself survives real-data and model-family checks, but the replicated predictor is mass. The next lensing step is therefore sharper residual construction and direct metallicity-capable catalogs, not additional qualitative argument.
 
@@ -454,7 +473,7 @@ These are documented for completeness and to prevent others from repeating dead 
 
 ## Computational Verification
 
-All results are verified using independent computational tools:
+The computational components of the project are checked using independent tools:
 
 - **NumPy/SciPy:** Wheeler-DeWitt eigensolve, geodesic integration, density matrix evolution, PDE integration
 - **Wolfram Mathematica 14.3:** 23 symbolic verification modules covering Lagrangian analysis, Christoffel symbols, Ricci scalar, tortoise coordinates, WKB tunneling, bound states, energy conditions, stability analysis, 3+1D extension
@@ -468,14 +487,14 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 
 | Component | Status |
 |-----------|--------|
-| Core theorems (horizon, confinement, proper time) | Computationally verified |
+| Core theorems (horizon, confinement, proper time) | Abstract theorem spine formalized in Coq; dimensional cases computationally checked |
 | Zeno spectral test (simulator, 6--1000 sites) | Complete, 0.06% accuracy |
-| Zeno spectral test (IBM hardware, 3 runs) | Complete, revival confirmed |
-| Potential shape discrimination | Complete, $1/N^2$ preferred at 2.1x |
-| Metering field equation (PDE + stability) | Complete, stable, self-consistent |
-| Photon decoupling | Formalized |
-| Decoherence rate source criterion | Formalized |
-| Void metering + cosmological predictions | Complete |
+| Zeno spectral test (IBM hardware, 3 runs) | Complete, revival observed in the tested lattice model |
+| Potential shape discrimination | 6-site hardware comparison complete; $1/N^2$ gives the best fit among tested shapes |
+| Metering field equation (PDE + stability) | Numerical study complete; stable in the tested setups |
+| Photon decoupling | Model consequence of the mass-term-only coupling |
+| Decoherence rate source criterion | Proposed and computationally explored; not observationally established |
+| Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
 | Archival lensing analysis (2 clusters, 22 model families) | Initial run complete; morphology replicated, mass-linked; proxy signal not established |
 | Coq formalization | Initial abstract theorem development complete; monolithic file compiles |
 | Physical $\alpha$ measurement | Open |
