@@ -1,0 +1,32 @@
+{
+  "abell370": {
+    "scenario": "hff_member_geometry:abell370",
+    "component_count": 25,
+    "negative_kappa_fraction_resolved": 0.0,
+    "negative_residual_fraction_resolved": 0.06093383811069046,
+    "positive_residual_fraction_resolved": 0.06604170422450574,
+    "harmonics": {
+      "m1": 0.19004795282834228,
+      "m2": 0.04735958500194179,
+      "m3": 0.0456326685120298,
+      "m4": 0.11472327976927861
+    },
+    "sign_flip_count": 12,
+    "principal_axis_angle_deg": 48.47316139276736
+  },
+  "rxcj2248": {
+    "scenario": "hff_member_geometry:rxcj2248",
+    "component_count": 25,
+    "negative_kappa_fraction_resolved": 0.0,
+    "negative_residual_fraction_resolved": 0.07884141578030167,
+    "positive_residual_fraction_resolved": 0.08070428459828136,
+    "harmonics": {
+      "m1": 0.2342459224340246,
+      "m2": 0.04287485230182227,
+      "m3": 0.014654176025384364,
+      "m4": 0.040909384901703864
+    },
+    "sign_flip_count": 12,
+    "principal_axis_angle_deg": 87.04125230047778
+  }
+}

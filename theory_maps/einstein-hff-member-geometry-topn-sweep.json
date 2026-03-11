@@ -1,0 +1,84 @@
+{
+  "abell370": [
+    {
+      "top_n": 10,
+      "negative_kappa_fraction_resolved": 0.0,
+      "negative_residual_fraction_resolved": 0.0498167177453278,
+      "positive_residual_fraction_resolved": 0.07475512288924945,
+      "harmonics": {
+        "m1": 0.08152571821375924,
+        "m2": 0.05089236378118943,
+        "m3": 0.05579517014957082,
+        "m4": 0.12044714520443044
+      },
+      "sign_flip_count": 18
+    },
+    {
+      "top_n": 25,
+      "negative_kappa_fraction_resolved": 0.0,
+      "negative_residual_fraction_resolved": 0.06093383811069046,
+      "positive_residual_fraction_resolved": 0.06604170422450574,
+      "harmonics": {
+        "m1": 0.19004795282834228,
+        "m2": 0.04735958500194179,
+        "m3": 0.0456326685120298,
+        "m4": 0.11472327976927861
+      },
+      "sign_flip_count": 12
+    },
+    {
+      "top_n": 40,
+      "negative_kappa_fraction_resolved": 0.0,
+      "negative_residual_fraction_resolved": 0.06544077879935101,
+      "positive_residual_fraction_resolved": 0.07986298900306472,
+      "harmonics": {
+        "m1": 0.2226467812433313,
+        "m2": 0.04318829056898903,
+        "m3": 0.04067847651248527,
+        "m4": 0.10447398868190334
+      },
+      "sign_flip_count": 10
+    }
+  ],
+  "rxcj2248": [
+    {
+      "top_n": 10,
+      "negative_kappa_fraction_resolved": 0.0,
+      "negative_residual_fraction_resolved": 0.07956252629048735,
+      "positive_residual_fraction_resolved": 0.07613725136710535,
+      "harmonics": {
+        "m1": 0.22424780014317863,
+        "m2": 0.025746381229414937,
+        "m3": 0.020109281383471976,
+        "m4": 0.04101923608415827
+      },
+      "sign_flip_count": 16
+    },
+    {
+      "top_n": 25,
+      "negative_kappa_fraction_resolved": 0.0,
+      "negative_residual_fraction_resolved": 0.07884141578030167,
+      "positive_residual_fraction_resolved": 0.08070428459828136,
+      "harmonics": {
+        "m1": 0.2342459224340246,
+        "m2": 0.04287485230182227,
+        "m3": 0.014654176025384364,
+        "m4": 0.040909384901703864
+      },
+      "sign_flip_count": 12
+    },
+    {
+      "top_n": 40,
+      "negative_kappa_fraction_resolved": 0.0,
+      "negative_residual_fraction_resolved": 0.07679826933477556,
+      "positive_residual_fraction_resolved": 0.08767501953007632,
+      "harmonics": {
+        "m1": 0.25403364371589476,
+        "m2": 0.030620896288788536,
+        "m3": 0.014452544070729226,
+        "m4": 0.019307664671416327
+      },
+      "sign_flip_count": 8
+    }
+  ]
+}

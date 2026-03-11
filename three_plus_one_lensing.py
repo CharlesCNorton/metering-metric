@@ -18,10 +18,12 @@ and makes one mainline point explicit:
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import math
 import warnings
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -1060,6 +1062,82 @@ def composite_component_specs(scenario: str, separation: float, subcluster_ratio
     raise ValueError(f"Unknown scenario: {scenario}")
 
 
+def load_member_geometry_component_specs(
+    member_table_path: Path,
+    top_members: int,
+    mass_key: str,
+    member_flag_key: str,
+    ra_key: str,
+    dec_key: str,
+    size_scaling_exponent: float,
+    minimum_size_scale: float,
+) -> tuple[list[dict], dict[str, float]]:
+    with member_table_path.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+
+    members = []
+    for row in rows:
+        try:
+            member_flag = int(float(row[member_flag_key]))
+            mass = float(row[mass_key])
+            ra = float(row[ra_key])
+            dec = float(row[dec_key])
+        except (KeyError, ValueError):
+            continue
+        if member_flag != 1:
+            continue
+        if not math.isfinite(mass) or mass <= 0.0:
+            continue
+        members.append(
+            {
+                "name": f"member_{row.get('IDcat', len(members) + 1)}",
+                "mass": mass,
+                "ra": ra,
+                "dec": dec,
+            }
+        )
+
+    if not members:
+        raise ValueError("No valid cluster members were found in the member table.")
+
+    members.sort(key=lambda item: item["mass"], reverse=True)
+    selected = members[:top_members]
+    total_mass = sum(item["mass"] for item in selected)
+    centroid_ra = sum(item["mass"] * item["ra"] for item in selected) / total_mass
+    centroid_dec = sum(item["mass"] * item["dec"] for item in selected) / total_mass
+    cos_dec = math.cos(math.radians(centroid_dec))
+    max_mass = max(item["mass"] for item in selected)
+
+    component_specs = []
+    for item in selected:
+        weight = item["mass"] / max_mass
+        size_scale = max(weight**size_scaling_exponent, minimum_size_scale)
+        component_specs.append(
+            {
+                "name": item["name"],
+                "center_x": (item["ra"] - centroid_ra) * cos_dec * 3600.0,
+                "center_y": (item["dec"] - centroid_dec) * 3600.0,
+                "amplitude_scale": weight,
+                "sigma_scale": size_scale,
+                "core_scale": size_scale,
+                "scale_radius_scale": size_scale,
+                "weight": weight,
+                "member_mass": item["mass"],
+            }
+        )
+
+    metadata = {
+        "top_members": float(len(component_specs)),
+        "selected_mass_sum": float(total_mass),
+        "max_member_mass": float(max_mass),
+        "centroid_ra_deg": float(centroid_ra),
+        "centroid_dec_deg": float(centroid_dec),
+        "size_scaling_exponent": float(size_scaling_exponent),
+        "minimum_size_scale": float(minimum_size_scale),
+    }
+    return component_specs, metadata
+
+
 def build_multicomponent_lensing_map(
     component_payloads: list[dict],
     extent: float,
@@ -1596,6 +1674,72 @@ def command_cluster_composite_map(args: argparse.Namespace) -> None:
     print(json.dumps(result, indent=2))
 
 
+def command_member_geometry_map(args: argparse.Namespace) -> None:
+    component_specs, selection_metadata = load_member_geometry_component_specs(
+        member_table_path=Path(args.member_table),
+        top_members=args.top_members,
+        mass_key=args.mass_key,
+        member_flag_key=args.member_flag_key,
+        ra_key=args.ra_key,
+        dec_key=args.dec_key,
+        size_scaling_exponent=args.size_scaling_exponent,
+        minimum_size_scale=args.minimum_size_scale,
+    )
+    component_payloads = []
+    for spec in component_specs:
+        profile = solve_screened_poisson_cluster_profile(
+            source_kind=args.source_kind,
+            source_amplitude=args.source_amplitude * float(spec.get("amplitude_scale", 1.0)),
+            source_sigma=args.source_sigma * float(spec.get("sigma_scale", 1.0)),
+            source_core_radius=args.source_core_radius * float(spec.get("core_scale", 1.0)),
+            source_scale_radius=args.source_scale_radius * float(spec.get("scale_radius_scale", 1.0)),
+            source_beta=args.source_beta,
+            source_outer_slope=args.source_outer_slope,
+            screening_mass=args.screening_mass,
+            profile_r_max=args.profile_r_max,
+            profile_samples=args.profile_samples,
+        )
+        metric = einstein_scalar_backreaction_metric_from_profile(
+            profile=profile,
+            density_scale=args.density_scale,
+            gravity_scale=args.gravity_scale,
+            exterior_match_tolerance=args.exterior_match_tolerance,
+        )
+        radial_profile = sample_axisymmetric_lensing_profile(
+            metric,
+            impact_min=args.impact_min,
+            impact_max=args.impact_max,
+            samples=args.radial_samples,
+            r_max=args.r_max,
+        )
+        component_payloads.append(
+            {
+                "spec": spec,
+                "source_profile": profile.metadata,
+                "metric_metadata": metric.metadata,
+                "radial_profile": radial_profile,
+            }
+        )
+
+    map_payload = build_multicomponent_lensing_map(
+        component_payloads=component_payloads,
+        extent=args.map_extent,
+        grid_size=args.grid_size,
+        radial_bin_width=args.radial_bin_width,
+        smooth_sigma_px=args.smooth_sigma_px,
+        axis_samples=args.axis_samples,
+        include_arrays=args.include_map_arrays,
+    )
+    result = {
+        "scenario": "hff_member_geometry",
+        "member_table": str(args.member_table),
+        "selection_metadata": selection_metadata,
+        "components": component_payloads,
+        "map": map_payload,
+    }
+    print(json.dumps(result, indent=2))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Evaluate 3+1D photon observables for static spherical metrics.",
@@ -1736,6 +1880,43 @@ def build_parser() -> argparse.ArgumentParser:
     composite_map.add_argument("--axis-samples", type=int, default=257)
     composite_map.add_argument("--include-map-arrays", action="store_true")
     composite_map.set_defaults(func=command_cluster_composite_map)
+
+    member_geometry = subparsers.add_parser(
+        "member-geometry-map",
+        help="Build Einstein-branch residual maps from a real cluster-member table.",
+    )
+    member_geometry.add_argument("--member-table", required=True)
+    member_geometry.add_argument("--top-members", type=int, default=25)
+    member_geometry.add_argument("--mass-key", default="mass_neb")
+    member_geometry.add_argument("--member-flag-key", default="is_cluster_member")
+    member_geometry.add_argument("--ra-key", default="ra")
+    member_geometry.add_argument("--dec-key", default="dec")
+    member_geometry.add_argument("--size-scaling-exponent", type=float, default=0.5)
+    member_geometry.add_argument("--minimum-size-scale", type=float, default=0.2)
+    member_geometry.add_argument("--source-kind", choices=["gaussian", "beta_model", "softened_nfw"], default="softened_nfw")
+    member_geometry.add_argument("--source-amplitude", type=float, default=1.0e-3)
+    member_geometry.add_argument("--source-sigma", type=float, default=120.0)
+    member_geometry.add_argument("--source-core-radius", type=float, default=60.0)
+    member_geometry.add_argument("--source-scale-radius", type=float, default=350.0)
+    member_geometry.add_argument("--source-beta", type=float, default=0.8)
+    member_geometry.add_argument("--source-outer-slope", type=float, default=3.0)
+    member_geometry.add_argument("--screening-mass", type=float, default=0.01)
+    member_geometry.add_argument("--density-scale", type=float, default=1.0e-6)
+    member_geometry.add_argument("--gravity-scale", type=float, default=1.0)
+    member_geometry.add_argument("--exterior-match-tolerance", type=float, default=1.0e-6)
+    member_geometry.add_argument("--profile-r-max", type=float, default=8.0e3)
+    member_geometry.add_argument("--profile-samples", type=int, default=4096)
+    member_geometry.add_argument("--impact-min", type=float, default=30.0)
+    member_geometry.add_argument("--impact-max", type=float, default=4.0e3)
+    member_geometry.add_argument("--radial-samples", type=int, default=64)
+    member_geometry.add_argument("--r-max", type=float, default=8.0e4)
+    member_geometry.add_argument("--map-extent", type=float, default=4.0e3)
+    member_geometry.add_argument("--grid-size", type=int, default=129)
+    member_geometry.add_argument("--radial-bin-width", type=float, default=120.0)
+    member_geometry.add_argument("--smooth-sigma-px", type=float, default=3.0)
+    member_geometry.add_argument("--axis-samples", type=int, default=257)
+    member_geometry.add_argument("--include-map-arrays", action="store_true")
+    member_geometry.set_defaults(func=command_member_geometry_map)
 
     return parser
 
