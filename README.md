@@ -469,6 +469,28 @@ The bound-state count (~69 radial in 1+1D, ~600 at 1000 sites, ~17 bits in 3+1D 
 
 The mass-term coupling means $m_{\text{eff}} = m_0 / N(x)$. Heavier particles have larger absolute mass divergence in voids. The species hierarchy for void propagation is: heavy particles freeze first, light particles last. Neutrinos (lightest massive) are least affected. This may widen the detectable parameter window if the critical $N$ threshold varies by species.
 
+### Deferred Covariant Branch: $N^{-4}$ Massive-Sector Completion
+
+A distinct theoretical branch has now been identified but is being kept separate from the active line of work. In that branch, the massive sector couples to a static metering metric
+
+$$ds_m^2 = -N(x)^2 dt^2 + h_{ij}(x) dx^i dx^j$$
+
+with a local mass-shell term scaled as
+
+$$\mathcal{L}_{\text{massive}} \sim -\frac{1}{2}\sqrt{-g_m}\left(g_m^{\mu\nu}\partial_\mu \Phi \, \partial_\nu \Phi + \frac{m_0^2}{N(x)^4}\Phi^2\right)$$
+
+so that
+
+$$m_{\text{eff}}(x) = \frac{m_0}{N(x)^2}.$$
+
+This branch matters because if the same $N$ serves both as lapse and as the field controlling the mass term, then the simpler $m_0^2/N^2$ scaling does not by itself create a horizon-driven forbidden region in the local Hamilton-Jacobi equation: the mass term and the redshifted energy term scale the same way. By contrast, the $N^{-4}$ branch gives a finite-energy turning surface
+
+$$N_*(E) = \frac{m_0}{E},$$
+
+so for $N < N_*(E)$ the massive mode is classically excluded. Near a simple zero of the lapse, the WKB barrier grows rapidly and the near-horizon wavefunction is exponentially suppressed. In that sense, the $N^{-4}$ branch gives a cleaner local covariant realization of horizon-adjacent confinement than the current same-lapse $1/N^2$ story.
+
+This is **not** the active branch of the repository. The current theorem spine, lattice numerics, hardware comparison, and README claims are organized around the tested $1/N^2$ potential. Moving to the $N^{-4}$ branch would therefore require a deliberate reworking of the covariant completion, the continuum spectral analysis, and the interpretation of the existing lattice evidence. It is being recorded here as a deferred branch to evaluate only after the present mainline program has been carried through.
+
 ---
 
 ## Negative Results
