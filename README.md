@@ -43,8 +43,8 @@ This repository mixes several different kinds of support, and they should not be
 - **Coq-formalized:** the root file [`meteringmetric.v`](./meteringmetric.v) currently formalizes the abstract real-analysis skeleton of the framework: proper-time vanishing, tortoise-coordinate divergence, and a WKB-style confinement barrier theorem under stated hypotheses on the activation function and metering profile.
 - **Computationally checked:** the lattice, PDE, and cosmology sections are supported by numerical experiments and symbolic derivations, not by formal proof.
 - **Hardware-backed:** the IBM Quantum section is evidence for discrete bound-state structure in the tested lattice model, not a direct measurement of the physical spacetime coupling constant.
-- **Archival observationally tested:** the cluster-lensing section now has an initial archive run on two HFF fields and 22 independent lens-model families. That run finds a reproducible morphology, but the replicated explanatory axis is mass, not the proposed complexity proxies.
-- **Still speculative:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies rather than mass remain open.
+- **Archival observational program:** the cluster-lensing section currently runs on two HFF fields, BUFFALO v2 proxy catalogs, and 22 independent lens-model families. The sign-flip morphology survives those checks. The most stable explanatory axes are local convergence and stellar mass. A BUFFALO-based continuum proxy is stronger than the earlier HFF-matched stand-in, but its support is cluster-asymmetric rather than settled.
+- **Open empirical question:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies beyond mass and local convergence remain open.
 
 ---
 
@@ -384,11 +384,17 @@ The Ricci scalar $R(x)$ changes sign at the metering boundary:
 
 This **convergence-divergence sign flip** is a unique morphological signature. Dark matter subhalos produce convergence only. Modified gravity (f(R), MOND) alters amplitude but not the sign pattern. The metering boundary's sign-flip pattern is structurally distinct.
 
-**Observational target:** Galaxy cluster lensing residuals. Regress against galaxy metallicity and star formation rate (proxies for decoherence rate density) rather than mass alone. A correlation with the predicted convergence-plus-divergence morphology at high-complexity galaxy positions would constitute evidence.
+**Observational target:** Galaxy cluster lensing residuals. Test direct metallicity and other decoherence-relevant proxies against stellar mass and local convergence under explicit controls. A proxy that carries conditional signal beyond those baseline axes, while preserving the predicted convergence-plus-divergence morphology, would constitute evidence.
 
 This analysis requires no new observations. HST, JWST, and Chandra archival data suffice.
 
-**Initial archival result (2026-03-11):** A real-data pass has now been run on the two public HFF fields with derived galaxy-property catalogs (`Abell 370`, `RXC J2248 / Abell S1063`) using the official HFF property catalogs, matching HFF photometry catalogs, and 22 independent frontier-model `kappa` maps. The convergence-divergence morphology is reproducible across model families, but the stable explanatory axis is stellar mass rather than the proposed decoherence proxies. In the primary two-cluster radial-median analysis, the mass effect combines at Fisher $p \approx 1.0 \times 10^{-4}$. Across the 22 model-family runs, mass is positive in 22/22 and significant in 20/22. Star formation rate is positive and often significant in `Abell 370`, but does not replicate in `RXC J2248 / Abell S1063`. A matched photometric continuum-slope proxy also fails to replicate. The archival lensing test therefore supports a real sign-flip-like morphology, but does not yet support the stronger claim that it tracks complexity proxies rather than mass.
+The current archival program works on the two public HFF cluster fields (`Abell 370`, `RXC J2248 / Abell S1063`) using the official HFF property catalogs, BUFFALO v2 photometric proxy catalogs, and 22 independent frontier-model `kappa` maps. The sign-flip-like morphology is reproducible across model families, so the observational question is no longer whether the morphology exists in the archive; it is which explanatory axis survives the controls.
+
+At present, `local_kappa` is the strongest and most stable predictor. Across the 22 model-family runs it is positive in `21/22`, significant in `19/22`, and has median partial correlation `0.3908`. Stellar mass remains a real axis as well: positive in `17/22`, significant in `8/22`, with median partial correlation `0.0945`.
+
+The BUFFALO-based continuum proxy is materially better than the earlier HFF-matched continuum slope. In the 22 model-family runs it is positive in `15/22`, significant in `7/22`, with median partial correlation `0.0667`. In the primary two-cluster radial-median pass its Fisher-combined significance is `p \approx 6.4 \times 10^{-3}`. But that improvement is not yet uniform: the signal is carried mainly by `RXC J2248 / Abell S1063`, while `Abell 370` remains weak. In other words, the proxy is now a live but not yet cluster-replicated signal.
+
+That sets the next observational move. The immediate task is not to broaden the narrative or add clusters indiscriminately. The immediate task is to sharpen the residual construction and replace the continuum proxy with direct metallicity-capable or otherwise stronger decoherence-relevant catalogs, then rerun the same mass-controlled, radius-controlled, local-convergence-controlled model-family ensemble.
 
 ### GW170817 Compatibility
 
@@ -427,7 +433,13 @@ If any of these channels proved real, they would suggest a new SETI-style method
 
 The convergence-divergence sign-flip morphology at void boundaries is proposed here as a structural signature that differs from standard CDM subhalo convergence patterns and from simple amplitude-only modified-gravity distortions. Test: lensing residuals in existing cluster surveys, correlated with proxies for information-processing density. Requires no new observations.
 
-An initial cluster-core archival pass is now complete on the two HFF fields with derived galaxy-property catalogs. The morphology itself survives real-data and model-family checks, but the replicated predictor is mass. The next lensing step is therefore sharper residual construction and direct metallicity-capable catalogs, not additional qualitative argument.
+The working archival lensing program now has three pieces:
+
+1. establish the morphology itself under model-family variation,
+2. force every proposed proxy to compete against mass and local convergence under explicit controls,
+3. only expand the cluster sample after a proxy survives that conditional test.
+
+Within that program, the next lensing step is sharper residual construction plus direct metallicity-capable or otherwise stronger decoherence-relevant catalogs. The BUFFALO continuum proxy has improved the situation enough to justify that next step, but not enough to close the case.
 
 ---
 
@@ -495,7 +507,7 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Photon decoupling | Model consequence of the mass-term-only coupling |
 | Decoherence rate source criterion | Proposed and computationally explored; not observationally established |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
-| Archival lensing analysis (2 clusters, 22 model families) | Initial run complete; morphology replicated, mass-linked; proxy signal not established |
+| Archival lensing program (2 clusters, 22 model families, BUFFALO proxy catalogs) | Morphology replicated; local convergence and mass are stable; BUFFALO continuum proxy improved but cluster-asymmetric; next step is stronger proxy catalogs plus residual hardening |
 | Coq formalization | Initial abstract theorem development complete; monolithic file compiles |
 | Physical $\alpha$ measurement | Open |
 

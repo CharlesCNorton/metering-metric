@@ -8,15 +8,21 @@
 .nra.cache
 *.pyc
 __pycache__/
+.coq-native/
 lensing_manifest.json
 toy_lensing/
+toy_lensing_validation/
 abell370_firstpass/
 abell370_firstpass_radial/
+abell370_validation/
 rxcj2248_firstpass/
 combined_firstpass/
+combined_firstpass_buffalo/
 robustness_sweep/
 full_experiment/
 full_experiment_proxy/
+full_experiment_buffalo/
+proxy_catalog_inspect/
 tmp_inputs/
 
 coq/*.vo

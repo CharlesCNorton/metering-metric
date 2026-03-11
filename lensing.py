@@ -31,6 +31,8 @@ from typing import Iterable
 
 import numpy as np
 import requests
+import astropy.units as u
+from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
 from scipy.ndimage import gaussian_filter
@@ -58,12 +60,12 @@ OFFICIAL_PRODUCTS = {
         "hff_cats_v4.1_kappa": "https://archive.stsci.edu/pub/hlsp/frontier/abell2744/models/cats/v4.1/hlsp_frontier_model_abell2744_cats_v4.1_kappa.fits",
     },
     "abell370": {
-        "hff_phot_catalog": "https://archive.stsci.edu/hlsps/hffcatalogs/hlsp_hffcatalogs_multi_multi_abell370_multi_v1_phot-cat.fits",
+        "buffalo_proxy_catalog": "https://archive.stsci.edu/hlsps/buffalo/abell370/catalogs/pagul-v2.0/hlsp_buffalo_hst_ir-weighted_abell370_multi_v2.0_catalog.fits",
         "hff_properties_catalog": "https://archive.stsci.edu/hlsps/hffcatalogs/hlsp_hffcatalogs_multi_multi_abell370_multi_v1_prop-cat.fits",
         "hff_cats_v4_kappa": "https://archive.stsci.edu/pub/hlsp/frontier/abell370/models/cats/v4/hlsp_frontier_model_abell370_cats_v4_kappa.fits",
     },
     "rxcj2248": {
-        "hff_phot_catalog": "https://archive.stsci.edu/hlsps/hffcatalogs/hlsp_hffcatalogs_multi_multi_rxc-j2248_multi_v1_phot-cat.fits",
+        "buffalo_proxy_catalog": "https://archive.stsci.edu/hlsps/buffalo/abells1063/catalogs/pagul-v2.0/hlsp_buffalo_hst_ir-weighted_abells1063_multi_v2.0_catalog.fits",
         "hff_properties_catalog": "https://archive.stsci.edu/hlsps/hffcatalogs/hlsp_hffcatalogs_multi_multi_rxc-j2248_multi_v1_prop-cat.fits",
         "hff_cats_v4.1_kappa": "https://archive.stsci.edu/pub/hlsp/frontier/abells1063/models/cats/v4.1/hlsp_frontier_model_abells1063_cats_v4.1_kappa.fits",
     },
@@ -72,10 +74,10 @@ OFFICIAL_PRODUCTS = {
 HFF_CLUSTER_CONFIG = {
     "abell370": {
         "archive_cluster_name": "abell370",
-        "phot_key": "hff_phot_catalog",
+        "proxy_key": "buffalo_proxy_catalog",
         "catalog_key": "hff_properties_catalog",
         "kappa_key": "hff_cats_v4_kappa",
-        "phot_filename": "abell370_phot.fits",
+        "proxy_filename": "abell370_buffalo_proxy.fits",
         "catalog_filename": "abell370_properties.fits",
         "kappa_filename": "abell370_kappa.fits",
         "label": "Abell 370",
@@ -83,10 +85,10 @@ HFF_CLUSTER_CONFIG = {
     },
     "rxcj2248": {
         "archive_cluster_name": "abells1063",
-        "phot_key": "hff_phot_catalog",
+        "proxy_key": "buffalo_proxy_catalog",
         "catalog_key": "hff_properties_catalog",
         "kappa_key": "hff_cats_v4.1_kappa",
-        "phot_filename": "rxcj2248_phot.fits",
+        "proxy_filename": "abells1063_buffalo_proxy.fits",
         "catalog_filename": "rxcj2248_properties.fits",
         "kappa_filename": "abells1063_kappa.fits",
         "label": "RXC J2248 / Abell S1063",
@@ -123,13 +125,23 @@ HFF_MODEL_VERSIONS = {
     },
 }
 
-HFF_PROXY_BANDS = [
-    ("f435w_mag", 0.4325),
-    ("f606w_mag", 0.5921),
-    ("f814w_mag", 0.8045),
-    ("f125w_mag", 1.2486),
-    ("f160w_mag", 1.5369),
+BUFFALO_PROXY_BANDS = [
+    ("FLUX_F275W", "FLUXERR_F275W", 0.275),
+    ("FLUX_F336W", "FLUXERR_F336W", 0.336),
+    ("FLUX_F435W", "FLUXERR_F435W", 0.435),
+    ("FLUX_F475W", "FLUXERR_F475W", 0.475),
+    ("FLUX_F606W", "FLUXERR_F606W", 0.606),
+    ("FLUX_F625W", "FLUXERR_F625W", 0.625),
+    ("FLUX_F814W", "FLUXERR_F814W", 0.814),
+    ("FLUX_F105W", "FLUXERR_F105W", 1.05),
+    ("FLUX_F110W", "FLUXERR_F110W", 1.10),
+    ("FLUX_F125W", "FLUXERR_F125W", 1.25),
+    ("FLUX_F140W", "FLUXERR_F140W", 1.40),
+    ("FLUX_F160W", "FLUXERR_F160W", 1.54),
 ]
+BUFFALO_PROXY_MATCH_MAX_ARCSEC = 0.3
+BUFFALO_PROXY_MIN_BANDS = 6
+BUFFALO_PROXY_MIN_SNR = 2.0
 
 CLI_EPILOG = """Examples:
   python lensing.py manifest --out lensing_manifest.json
@@ -338,53 +350,87 @@ def frontier_model_kappa_url(cluster_key: str, model_family: str) -> str:
     )
 
 
-def parse_catalog_numeric_id(raw_value: object) -> int | None:
-    text = str(raw_value)
-    digits = []
-    for char in reversed(text):
-        if char.isdigit():
-            digits.append(char)
-        elif digits:
-            break
-    if not digits:
-        return None
-    return int("".join(reversed(digits)))
-
-
-def finite_magnitude(value: object) -> float | None:
-    magnitude = float(value)
-    if np.isfinite(magnitude) and magnitude < 90.0:
-        return magnitude
+def finite_positive_float(value: object) -> float | None:
+    numeric = float(value)
+    if np.isfinite(numeric) and numeric > 0.0:
+        return numeric
     return None
 
 
-def photometric_continuum_proxy(phot_row: object) -> tuple[float | None, int]:
+def flux_microjy_to_ab_magnitude(flux_microjy: float) -> float:
+    return 23.9 - 2.5 * math.log10(flux_microjy)
+
+
+def buffalo_continuum_proxy(buffalo_row: object, redshift: float) -> tuple[float | None, int]:
+    safe_redshift = redshift if np.isfinite(redshift) and redshift >= 0.0 else 0.0
     xs = []
     ys = []
-    for column, wavelength_microns in HFF_PROXY_BANDS:
-        magnitude = finite_magnitude(phot_row[column])
-        if magnitude is None:
+    weights = []
+    for flux_key, fluxerr_key, wavelength_microns in BUFFALO_PROXY_BANDS:
+        flux = finite_positive_float(buffalo_row[flux_key])
+        fluxerr = finite_positive_float(buffalo_row[fluxerr_key])
+        if flux is None or fluxerr is None:
             continue
-        xs.append(math.log10(wavelength_microns))
+        snr = flux / fluxerr
+        if snr < BUFFALO_PROXY_MIN_SNR:
+            continue
+        rest_wavelength_microns = wavelength_microns / (1.0 + safe_redshift)
+        magnitude = flux_microjy_to_ab_magnitude(flux)
+        sigma_mag = 2.5 / math.log(10.0) * (fluxerr / flux)
+        xs.append(math.log10(rest_wavelength_microns))
         ys.append(magnitude)
-    if len(xs) < 3:
+        weights.append(1.0 / max(sigma_mag * sigma_mag, 1e-6))
+    if len(xs) < BUFFALO_PROXY_MIN_BANDS:
         return None, len(xs)
-    slope = float(np.polyfit(np.asarray(xs, dtype=float), np.asarray(ys, dtype=float), 1)[0])
+    slope = float(
+        np.polyfit(
+            np.asarray(xs, dtype=float),
+            np.asarray(ys, dtype=float),
+            1,
+            w=np.sqrt(np.asarray(weights, dtype=float)),
+        )[0]
+    )
     return slope, len(xs)
 
 
-def load_photometric_proxy_lookup(phot_path: Path) -> dict[int, dict]:
+def load_photometric_proxy_lookup(catalog_path: Path, proxy_catalog_path: Path) -> dict[int, dict]:
     lookup = {}
-    with fits.open(phot_path) as hdul:
-        for row in hdul[1].data:
-            catalog_id = parse_catalog_numeric_id(row["id"])
-            if catalog_id is None:
-                continue
-            proxy, band_count = photometric_continuum_proxy(row)
-            lookup[catalog_id] = {
-                "photometric_proxy": proxy,
-                "photometric_proxy_band_count": band_count,
-            }
+    with fits.open(catalog_path) as hdul:
+        hff_rows = hdul[1].data
+        hff_coords = SkyCoord(
+            ra=np.asarray(hff_rows["alpha_j2000"], dtype=float) * u.deg,
+            dec=np.asarray(hff_rows["delta_j2000"], dtype=float) * u.deg,
+        )
+    with fits.open(proxy_catalog_path) as hdul:
+        proxy_rows = hdul[1].data
+        proxy_coords = SkyCoord(
+            ra=np.asarray(proxy_rows["ALPHA_J2000_STACK"], dtype=float) * u.deg,
+            dec=np.asarray(proxy_rows["DELTA_J2000_STACK"], dtype=float) * u.deg,
+        )
+
+    nearest_proxy_idx, nearest_sep, _ = hff_coords.match_to_catalog_sky(proxy_coords)
+    reverse_hff_idx, _, _ = proxy_coords.match_to_catalog_sky(hff_coords)
+
+    for row_index, record in enumerate(hff_rows):
+        proxy_index = int(nearest_proxy_idx[row_index])
+        match_sep_arcsec = float(nearest_sep[row_index].arcsec)
+        if reverse_hff_idx[proxy_index] != row_index or match_sep_arcsec > BUFFALO_PROXY_MATCH_MAX_ARCSEC:
+            continue
+        proxy_row = proxy_rows[proxy_index]
+        proxy, band_count = buffalo_continuum_proxy(proxy_row, redshift=float(record["ZBEST"]))
+        lookup[int(record["IDcat"])] = {
+            "photometric_proxy": proxy,
+            "photometric_proxy_band_count": band_count,
+            "photometric_proxy_match_sep_arcsec": match_sep_arcsec,
+            "photometric_proxy_catalog_id": int(proxy_row["ID"]),
+            "photometric_proxy_ebv": (
+                float(proxy_row["E_BV"])
+                if np.isfinite(float(proxy_row["E_BV"]))
+                else float("nan")
+            ),
+            "photometric_proxy_nb_used": int(proxy_row["NB_USED"]),
+            "photometric_proxy_catalog_name": "BUFFALO v2.0",
+        }
     return lookup
 
 
@@ -603,6 +649,46 @@ def fit_linear_model(design: np.ndarray, response: np.ndarray, predictor_names: 
     }
 
 
+def sample_image_value(image: np.ndarray, xpix: float, ypix: float) -> float | None:
+    if not np.isfinite(xpix) or not np.isfinite(ypix):
+        return None
+    height, width = image.shape
+    if height == 0 or width == 0:
+        return None
+
+    x = float(np.clip(xpix, 0.0, width - 1))
+    y = float(np.clip(ypix, 0.0, height - 1))
+    x0 = int(math.floor(x))
+    x1 = min(x0 + 1, width - 1)
+    y0 = int(math.floor(y))
+    y1 = min(y0 + 1, height - 1)
+    dx = x - x0
+    dy = y - y0
+
+    weighted_values = []
+    weighted_weights = []
+    neighbors = [
+        ((1.0 - dx) * (1.0 - dy), image[y0, x0]),
+        (dx * (1.0 - dy), image[y0, x1]),
+        ((1.0 - dx) * dy, image[y1, x0]),
+        (dx * dy, image[y1, x1]),
+    ]
+    for weight, value in neighbors:
+        if weight > 0.0 and np.isfinite(value):
+            weighted_values.append(float(value))
+            weighted_weights.append(float(weight))
+
+    if weighted_weights:
+        return float(np.average(weighted_values, weights=weighted_weights))
+
+    xnearest = int(round(x))
+    ynearest = int(round(y))
+    nearest = float(image[ynearest, xnearest])
+    if np.isfinite(nearest):
+        return nearest
+    return None
+
+
 def score_cutout(
     residual: np.ndarray,
     footprint: np.ndarray,
@@ -650,6 +736,102 @@ def score_cutout(
         "contrast": inner_mean - ring_mean,
         "sign_flip_pass": int(inner_mean > 0.0 and ring_mean < 0.0),
     }
+
+
+def matched_group_difference(
+    predictor: np.ndarray,
+    response: np.ndarray,
+    controls: np.ndarray,
+    seed: int,
+    permutations: int,
+    high_quantile: float = 0.75,
+    low_quantile: float = 0.25,
+) -> dict:
+    result = {
+        "high_threshold": float("nan"),
+        "low_threshold": float("nan"),
+        "n_high_pool": 0,
+        "n_low_pool": 0,
+        "n_pairs": 0,
+        "mean_high_score": float("nan"),
+        "mean_matched_low_score": float("nan"),
+        "mean_paired_difference": float("nan"),
+        "median_paired_difference": float("nan"),
+        "mean_control_distance": float("nan"),
+        "permutation_p_value": float("nan"),
+        "permutations": permutations,
+    }
+
+    finite_mask = np.isfinite(predictor) & np.isfinite(response)
+    if controls.ndim == 1:
+        controls = controls.reshape(-1, 1)
+    finite_mask &= np.all(np.isfinite(controls), axis=1)
+    predictor = predictor[finite_mask]
+    response = response[finite_mask]
+    controls = controls[finite_mask]
+    if len(predictor) < 8:
+        return result
+
+    high_threshold = float(np.quantile(predictor, high_quantile))
+    low_threshold = float(np.quantile(predictor, low_quantile))
+    result["high_threshold"] = high_threshold
+    result["low_threshold"] = low_threshold
+    if not high_threshold > low_threshold:
+        return result
+
+    high_indices = np.flatnonzero(predictor >= high_threshold)
+    low_indices = np.flatnonzero(predictor <= low_threshold)
+    low_indices = np.asarray([index for index in low_indices if predictor[index] < high_threshold], dtype=int)
+    high_indices = np.asarray([index for index in high_indices if predictor[index] > low_threshold], dtype=int)
+    result["n_high_pool"] = int(len(high_indices))
+    result["n_low_pool"] = int(len(low_indices))
+    if len(high_indices) == 0 or len(low_indices) == 0:
+        return result
+
+    control_means = controls.mean(axis=0)
+    control_stds = controls.std(axis=0)
+    control_stds[control_stds == 0.0] = 1.0
+    controls_z = (controls - control_means) / control_stds
+
+    rng = np.random.default_rng(seed)
+    high_order = rng.permutation(high_indices)
+    available_low = list(low_indices.tolist())
+    pairs = []
+    pair_distances = []
+    for high_index in high_order:
+        if not available_low:
+            break
+        low_array = np.asarray(available_low, dtype=int)
+        distances = np.linalg.norm(controls_z[low_array] - controls_z[high_index], axis=1)
+        best_position = int(np.argmin(distances))
+        low_index = int(low_array[best_position])
+        pairs.append((int(high_index), low_index))
+        pair_distances.append(float(distances[best_position]))
+        del available_low[best_position]
+
+    if not pairs:
+        return result
+
+    high_pair_indices = np.asarray([high_index for high_index, _ in pairs], dtype=int)
+    low_pair_indices = np.asarray([low_index for _, low_index in pairs], dtype=int)
+    paired_differences = response[high_pair_indices] - response[low_pair_indices]
+    observed = float(np.mean(paired_differences))
+    sign_flips = rng.choice(np.asarray([-1.0, 1.0]), size=(permutations, len(paired_differences)))
+    permuted_means = np.mean(sign_flips * paired_differences, axis=1)
+    p_value = float((1 + np.sum(np.abs(permuted_means) >= abs(observed))) / (permutations + 1))
+
+    result.update(
+        {
+            "n_pairs": int(len(pairs)),
+            "mean_high_score": float(np.mean(response[high_pair_indices])),
+            "mean_matched_low_score": float(np.mean(response[low_pair_indices])),
+            "mean_paired_difference": observed,
+            "median_paired_difference": float(np.median(paired_differences)),
+            "mean_control_distance": float(np.mean(pair_distances)),
+            "permutation_p_value": p_value,
+        }
+    )
+    return result
 
 
 def partial_correlation_and_permutation_pvalue(
@@ -927,6 +1109,9 @@ def analyze_hff_cluster_map(
             )
             if score is None:
                 continue
+            local_kappa = sample_image_value(kappa, xpix, ypix)
+            if local_kappa is None:
+                continue
             inner_mean = score["inner_mean"]
             ring_mean = score["ring_mean"]
             sign_flip_score = score["sign_flip_score"]
@@ -950,6 +1135,7 @@ def analyze_hff_cluster_map(
                 "mass_neb": mass,
                 "sfr_neb": sfr,
                 "cluster_radius_arcsec": cluster_radius_arcsec,
+                "local_kappa": local_kappa,
                 "is_cluster_member": is_cluster_member,
                 "photometric_proxy": (
                     float(photometric_info["photometric_proxy"])
@@ -957,6 +1143,9 @@ def analyze_hff_cluster_map(
                     else float("nan")
                 ),
                 "photometric_proxy_band_count": photometric_info.get("photometric_proxy_band_count", 0),
+                "photometric_proxy_match_sep_arcsec": photometric_info.get("photometric_proxy_match_sep_arcsec", float("nan")),
+                "photometric_proxy_ebv": photometric_info.get("photometric_proxy_ebv", float("nan")),
+                "photometric_proxy_nb_used": photometric_info.get("photometric_proxy_nb_used", 0),
                 "inner_mean": inner_mean,
                 "ring_mean": ring_mean,
                 "sign_flip_score": sign_flip_score,
@@ -964,7 +1153,7 @@ def analyze_hff_cluster_map(
                 "sign_flip_pass": sign_flip_pass,
             }
             rows.append(row)
-            design.append([mass, sfr, zbest, math.log10(max(magnif, 1e-6)), cluster_radius_arcsec])
+            design.append([mass, sfr, zbest, math.log10(max(magnif, 1e-6)), cluster_radius_arcsec, local_kappa])
             response.append(sign_flip_score)
 
         if not rows:
@@ -973,7 +1162,7 @@ def analyze_hff_cluster_map(
     regression = fit_linear_model(
         np.asarray(design, dtype=float),
         np.asarray(response, dtype=float),
-        ["mass_neb", "sfr_neb", "zbest", "log10_magnif", "cluster_radius_arcsec"],
+        ["mass_neb", "sfr_neb", "zbest", "log10_magnif", "cluster_radius_arcsec", "local_kappa"],
     )
 
     cluster_rows = [row for row in rows if row["is_cluster_member"] == 1]
@@ -986,15 +1175,17 @@ def analyze_hff_cluster_map(
     cluster_zbest = np.asarray([row["zbest"] for row in cluster_rows], dtype=float)
     cluster_logmagnif = np.log10(np.maximum(np.asarray([row["magnif"] for row in cluster_rows], dtype=float), 1e-6))
     cluster_radius = np.asarray([row["cluster_radius_arcsec"] for row in cluster_rows], dtype=float)
+    cluster_local_kappa = np.asarray([row["local_kappa"] for row in cluster_rows], dtype=float)
 
     cluster_regression = fit_linear_model(
-        np.column_stack([cluster_mass, cluster_sfr, cluster_zbest, cluster_logmagnif, cluster_radius]),
+        np.column_stack([cluster_mass, cluster_sfr, cluster_zbest, cluster_logmagnif, cluster_radius, cluster_local_kappa]),
         cluster_score,
-        ["mass_neb", "sfr_neb", "zbest", "log10_magnif", "cluster_radius_arcsec"],
+        ["mass_neb", "sfr_neb", "zbest", "log10_magnif", "cluster_radius_arcsec", "local_kappa"],
     )
 
-    controls_for_mass = np.column_stack([cluster_sfr, cluster_zbest, cluster_logmagnif, cluster_radius])
-    controls_for_sfr = np.column_stack([cluster_mass, cluster_zbest, cluster_logmagnif, cluster_radius])
+    controls_for_mass = np.column_stack([cluster_sfr, cluster_zbest, cluster_logmagnif, cluster_radius, cluster_local_kappa])
+    controls_for_sfr = np.column_stack([cluster_mass, cluster_zbest, cluster_logmagnif, cluster_radius, cluster_local_kappa])
+    controls_for_local_kappa = np.column_stack([cluster_mass, cluster_sfr, cluster_zbest, cluster_logmagnif, cluster_radius])
     mass_partial = partial_correlation_and_permutation_pvalue(
         predictor=cluster_mass,
         response=cluster_score,
@@ -1009,6 +1200,36 @@ def analyze_hff_cluster_map(
         seed=seed + 1,
         permutations=permutations,
     )
+    local_kappa_partial = partial_correlation_and_permutation_pvalue(
+        predictor=cluster_local_kappa,
+        response=cluster_score,
+        controls=controls_for_local_kappa,
+        seed=seed + 2,
+        permutations=permutations,
+    )
+    matched_group_effects = {
+        "mass_high_vs_low": matched_group_difference(
+            predictor=cluster_mass,
+            response=cluster_score,
+            controls=controls_for_mass,
+            seed=seed + 20,
+            permutations=permutations,
+        ),
+        "sfr_high_vs_low": matched_group_difference(
+            predictor=cluster_sfr,
+            response=cluster_score,
+            controls=controls_for_sfr,
+            seed=seed + 21,
+            permutations=permutations,
+        ),
+        "local_kappa_high_vs_low": matched_group_difference(
+            predictor=cluster_local_kappa,
+            response=cluster_score,
+            controls=controls_for_local_kappa,
+            seed=seed + 22,
+            permutations=permutations,
+        ),
+    }
 
     mass_threshold = float(np.quantile(cluster_mass, 0.75))
     sfr_threshold = float(np.quantile(cluster_sfr, 0.75))
@@ -1026,6 +1247,10 @@ def analyze_hff_cluster_map(
             np.maximum(np.asarray([row["magnif"] for row in proxy_cluster_rows], dtype=float), 1e-6)
         )
         proxy_cluster_radius = np.asarray([row["cluster_radius_arcsec"] for row in proxy_cluster_rows], dtype=float)
+        proxy_cluster_local_kappa = np.asarray([row["local_kappa"] for row in proxy_cluster_rows], dtype=float)
+        proxy_cluster_match_sep = np.asarray([row["photometric_proxy_match_sep_arcsec"] for row in proxy_cluster_rows], dtype=float)
+        proxy_cluster_ebv = np.asarray([row["photometric_proxy_ebv"] for row in proxy_cluster_rows], dtype=float)
+        proxy_cluster_band_count = np.asarray([row["photometric_proxy_band_count"] for row in proxy_cluster_rows], dtype=float)
 
         proxy_regression = fit_linear_model(
             np.column_stack(
@@ -1036,6 +1261,7 @@ def analyze_hff_cluster_map(
                     proxy_cluster_zbest,
                     proxy_cluster_logmagnif,
                     proxy_cluster_radius,
+                    proxy_cluster_local_kappa,
                 ]
             ),
             proxy_cluster_score,
@@ -1046,17 +1272,32 @@ def analyze_hff_cluster_map(
                 "zbest",
                 "log10_magnif",
                 "cluster_radius_arcsec",
+                "local_kappa",
             ],
         )
 
         proxy_controls = np.column_stack(
-            [proxy_cluster_mass, proxy_cluster_sfr, proxy_cluster_zbest, proxy_cluster_logmagnif, proxy_cluster_radius]
+            [
+                proxy_cluster_mass,
+                proxy_cluster_sfr,
+                proxy_cluster_zbest,
+                proxy_cluster_logmagnif,
+                proxy_cluster_radius,
+                proxy_cluster_local_kappa,
+            ]
         )
         proxy_partial = partial_correlation_and_permutation_pvalue(
             predictor=proxy_cluster,
             response=proxy_cluster_score,
             controls=proxy_controls,
-            seed=seed + 2,
+            seed=seed + 3,
+            permutations=permutations,
+        )
+        proxy_matched = matched_group_difference(
+            predictor=proxy_cluster,
+            response=proxy_cluster_score,
+            controls=proxy_controls,
+            seed=seed + 23,
             permutations=permutations,
         )
         proxy_threshold = float(np.quantile(proxy_cluster, 0.75))
@@ -1065,6 +1306,9 @@ def analyze_hff_cluster_map(
             "n_cluster_members_with_proxy": len(proxy_cluster_rows),
             "mean_proxy": float(np.mean(proxy_cluster)),
             "std_proxy": float(np.std(proxy_cluster)),
+            "median_proxy_match_sep_arcsec": float(np.nanmedian(proxy_cluster_match_sep)),
+            "median_proxy_band_count": float(np.nanmedian(proxy_cluster_band_count)),
+            "mean_proxy_ebv": float(np.nanmean(proxy_cluster_ebv)),
             "high_proxy_threshold": proxy_threshold,
             "high_proxy_mean_score": float(np.mean(proxy_cluster_score[high_proxy_mask])),
             "high_proxy_pass_rate": float(
@@ -1072,6 +1316,7 @@ def analyze_hff_cluster_map(
             ),
             "regression": proxy_regression,
             "proxy_partial": proxy_partial,
+            "matched_high_vs_low": proxy_matched,
             "spearman": {
                 "proxy_vs_score": float(spearmanr(proxy_cluster, proxy_cluster_score).statistic),
             },
@@ -1081,11 +1326,28 @@ def analyze_hff_cluster_map(
             "n_cluster_members_with_proxy": 0,
             "mean_proxy": float("nan"),
             "std_proxy": float("nan"),
+            "median_proxy_match_sep_arcsec": float("nan"),
+            "median_proxy_band_count": float("nan"),
+            "mean_proxy_ebv": float("nan"),
             "high_proxy_threshold": float("nan"),
             "high_proxy_mean_score": float("nan"),
             "high_proxy_pass_rate": float("nan"),
             "regression": {},
             "proxy_partial": {"partial_correlation": float("nan"), "permutation_p_value": float("nan"), "permutations": permutations},
+            "matched_high_vs_low": {
+                "high_threshold": float("nan"),
+                "low_threshold": float("nan"),
+                "n_high_pool": 0,
+                "n_low_pool": 0,
+                "n_pairs": 0,
+                "mean_high_score": float("nan"),
+                "mean_matched_low_score": float("nan"),
+                "mean_paired_difference": float("nan"),
+                "median_paired_difference": float("nan"),
+                "mean_control_distance": float("nan"),
+                "permutation_p_value": float("nan"),
+                "permutations": permutations,
+            },
             "spearman": {"proxy_vs_score": float("nan")},
         }
 
@@ -1158,6 +1420,8 @@ def analyze_hff_cluster_map(
             "regression": cluster_regression,
             "mass_partial": mass_partial,
             "sfr_partial": sfr_partial,
+            "local_kappa_partial": local_kappa_partial,
+            "matched_group_effects": matched_group_effects,
             "photometric_proxy_analysis": photometric_proxy_analysis,
             "random_position_null": {
                 "mean_of_draw_means": random_null["mean_of_draw_means"],
@@ -1169,6 +1433,7 @@ def analyze_hff_cluster_map(
                 "mass_vs_score": float(spearmanr(cluster_mass, cluster_score).statistic),
                 "sfr_vs_score": float(spearmanr(cluster_sfr, cluster_score).statistic),
                 "radius_vs_score": float(spearmanr(cluster_radius, cluster_score).statistic),
+                "local_kappa_vs_score": float(spearmanr(cluster_local_kappa, cluster_score).statistic),
             },
         },
     }
@@ -1195,9 +1460,9 @@ def analyze_hff_cluster_firstpass(
     inputs_dir = out_dir / "inputs"
     config = HFF_CLUSTER_CONFIG[cluster_key]
     products = OFFICIAL_PRODUCTS[cluster_key]
-    phot_path = download_file(
-        products[config["phot_key"]],
-        inputs_dir / config["phot_filename"],
+    proxy_catalog_path = download_file(
+        products[config["proxy_key"]],
+        inputs_dir / config["proxy_filename"],
     )
     catalog_path = download_file(
         products[config["catalog_key"]],
@@ -1207,7 +1472,7 @@ def analyze_hff_cluster_firstpass(
         products[config["kappa_key"]],
         inputs_dir / config["kappa_filename"],
     )
-    photometric_proxy_lookup = load_photometric_proxy_lookup(phot_path)
+    photometric_proxy_lookup = load_photometric_proxy_lookup(catalog_path, proxy_catalog_path)
     return analyze_hff_cluster_map(
         cluster_key=cluster_key,
         catalog_path=catalog_path,
@@ -1216,8 +1481,9 @@ def analyze_hff_cluster_firstpass(
         out_dir=out_dir,
         result_prefix=f"{cluster_key}_firstpass",
         products_metadata={
-            "phot_catalog_url": products[config["phot_key"]],
-            "phot_catalog_filename": phot_path.name,
+            "proxy_catalog_url": products[config["proxy_key"]],
+            "proxy_catalog_filename": proxy_catalog_path.name,
+            "proxy_catalog_name": "BUFFALO v2.0",
             "properties_catalog_url": products[config["catalog_key"]],
             "properties_catalog_filename": catalog_path.name,
             "kappa_map_url": products[config["kappa_key"]],
@@ -1241,6 +1507,7 @@ def analyze_hff_cluster_firstpass(
 def summarize_cluster_result(result: dict) -> dict:
     cluster = result["cluster_member_analysis"]
     proxy = cluster.get("photometric_proxy_analysis", {})
+    matched = cluster.get("matched_group_effects", {})
     return {
         "cluster": result["cluster"],
         "cluster_key": result["cluster_key"],
@@ -1261,9 +1528,20 @@ def summarize_cluster_result(result: dict) -> dict:
         "mass_partial_p_value": cluster["mass_partial"]["permutation_p_value"],
         "sfr_partial_correlation": cluster["sfr_partial"]["partial_correlation"],
         "sfr_partial_p_value": cluster["sfr_partial"]["permutation_p_value"],
+        "local_kappa_partial_correlation": cluster["local_kappa_partial"]["partial_correlation"],
+        "local_kappa_partial_p_value": cluster["local_kappa_partial"]["permutation_p_value"],
+        "mass_matched_mean_difference": matched.get("mass_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "mass_matched_p_value": matched.get("mass_high_vs_low", {}).get("permutation_p_value", float("nan")),
+        "sfr_matched_mean_difference": matched.get("sfr_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "sfr_matched_p_value": matched.get("sfr_high_vs_low", {}).get("permutation_p_value", float("nan")),
         "n_cluster_members_with_proxy": proxy.get("n_cluster_members_with_proxy", 0),
+        "median_proxy_match_sep_arcsec": proxy.get("median_proxy_match_sep_arcsec", float("nan")),
+        "median_proxy_band_count": proxy.get("median_proxy_band_count", float("nan")),
+        "mean_proxy_ebv": proxy.get("mean_proxy_ebv", float("nan")),
         "photometric_proxy_partial_correlation": proxy.get("proxy_partial", {}).get("partial_correlation", float("nan")),
         "photometric_proxy_partial_p_value": proxy.get("proxy_partial", {}).get("permutation_p_value", float("nan")),
+        "photometric_proxy_matched_mean_difference": proxy.get("matched_high_vs_low", {}).get("mean_paired_difference", float("nan")),
+        "photometric_proxy_matched_p_value": proxy.get("matched_high_vs_low", {}).get("permutation_p_value", float("nan")),
         "random_null_p_value": cluster["random_position_null"]["p_value_cluster_mean_gt_random"],
     }
 
@@ -1287,15 +1565,15 @@ def analyze_hff_cluster_model_ensemble(
     inputs_dir = out_dir / "inputs"
     config = HFF_CLUSTER_CONFIG[cluster_key]
     products = OFFICIAL_PRODUCTS[cluster_key]
-    phot_path = download_file(
-        products[config["phot_key"]],
-        inputs_dir / config["phot_filename"],
+    proxy_catalog_path = download_file(
+        products[config["proxy_key"]],
+        inputs_dir / config["proxy_filename"],
     )
     catalog_path = download_file(
         products[config["catalog_key"]],
         inputs_dir / config["catalog_filename"],
     )
-    photometric_proxy_lookup = load_photometric_proxy_lookup(phot_path)
+    photometric_proxy_lookup = load_photometric_proxy_lookup(catalog_path, proxy_catalog_path)
 
     model_summaries = []
     run_counter = 0
@@ -1319,8 +1597,9 @@ def analyze_hff_cluster_model_ensemble(
             out_dir=out_dir,
             result_prefix=result_prefix,
             products_metadata={
-                "phot_catalog_url": products[config["phot_key"]],
-                "phot_catalog_filename": phot_path.name,
+                "proxy_catalog_url": products[config["proxy_key"]],
+                "proxy_catalog_filename": proxy_catalog_path.name,
+                "proxy_catalog_name": "BUFFALO v2.0",
                 "properties_catalog_url": products[config["catalog_key"]],
                 "properties_catalog_filename": catalog_path.name,
                 "kappa_map_url": kappa_url,
@@ -1347,6 +1626,8 @@ def analyze_hff_cluster_model_ensemble(
     mass_p = np.asarray([row["mass_partial_p_value"] for row in model_summaries], dtype=float)
     sfr_corr = np.asarray([row["sfr_partial_correlation"] for row in model_summaries], dtype=float)
     sfr_p = np.asarray([row["sfr_partial_p_value"] for row in model_summaries], dtype=float)
+    local_kappa_corr = np.asarray([row["local_kappa_partial_correlation"] for row in model_summaries], dtype=float)
+    local_kappa_p = np.asarray([row["local_kappa_partial_p_value"] for row in model_summaries], dtype=float)
     proxy_corr = np.asarray([row["photometric_proxy_partial_correlation"] for row in model_summaries], dtype=float)
     proxy_p = np.asarray([row["photometric_proxy_partial_p_value"] for row in model_summaries], dtype=float)
     random_p = np.asarray([row["random_null_p_value"] for row in model_summaries], dtype=float)
@@ -1384,6 +1665,11 @@ def analyze_hff_cluster_model_ensemble(
             "sfr_median_partial_correlation": float(np.median(sfr_corr)),
             "sfr_min_partial_correlation": float(np.min(sfr_corr)),
             "sfr_max_partial_correlation": float(np.max(sfr_corr)),
+            "local_kappa_positive_fraction": float(np.mean(local_kappa_corr > 0.0)),
+            "local_kappa_significant_fraction": float(np.mean((local_kappa_corr > 0.0) & (local_kappa_p < 0.05))),
+            "local_kappa_median_partial_correlation": float(np.median(local_kappa_corr)),
+            "local_kappa_min_partial_correlation": float(np.min(local_kappa_corr)),
+            "local_kappa_max_partial_correlation": float(np.max(local_kappa_corr)),
             "photometric_proxy_positive_fraction": float(np.mean(proxy_corr > 0.0)),
             "photometric_proxy_significant_fraction": float(np.mean((proxy_corr > 0.0) & (proxy_p < 0.05))),
             "photometric_proxy_median_partial_correlation": float(np.nanmedian(proxy_corr)),
@@ -1440,6 +1726,8 @@ def analyze_combined_hff_firstpass(
     mass_ps = [item["mass_partial_p_value"] for item in cluster_summaries]
     sfr_corrs = [item["sfr_partial_correlation"] for item in cluster_summaries]
     sfr_ps = [item["sfr_partial_p_value"] for item in cluster_summaries]
+    local_kappa_corrs = [item["local_kappa_partial_correlation"] for item in cluster_summaries]
+    local_kappa_ps = [item["local_kappa_partial_p_value"] for item in cluster_summaries]
     proxy_corrs = [item["photometric_proxy_partial_correlation"] for item in cluster_summaries]
     proxy_ps = [item["photometric_proxy_partial_p_value"] for item in cluster_summaries]
     random_ps = [item["random_null_p_value"] for item in cluster_summaries]
@@ -1468,6 +1756,8 @@ def analyze_combined_hff_firstpass(
             "mass_partial_fisher": combine_pvalues_fisher(mass_ps),
             "sfr_partial_meta": fisher_meta_correlation(sfr_corrs, member_counts.astype(int)),
             "sfr_partial_fisher": combine_pvalues_fisher(sfr_ps),
+            "local_kappa_partial_meta": fisher_meta_correlation(local_kappa_corrs, member_counts.astype(int)),
+            "local_kappa_partial_fisher": combine_pvalues_fisher(local_kappa_ps),
             "photometric_proxy_meta": fisher_meta_correlation(proxy_corrs, member_counts.astype(int)),
             "photometric_proxy_fisher": combine_pvalues_fisher(proxy_ps),
             "random_null_fisher": combine_pvalues_fisher(random_ps),
@@ -1479,6 +1769,10 @@ def analyze_combined_hff_firstpass(
                 "sfr_positive_cluster_count": int(sum(value > 0.0 for value in sfr_corrs)),
                 "sfr_significant_cluster_count": int(
                     sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(sfr_corrs, sfr_ps))
+                ),
+                "local_kappa_positive_cluster_count": int(sum(value > 0.0 for value in local_kappa_corrs)),
+                "local_kappa_significant_cluster_count": int(
+                    sum(corr > 0.0 and p_value < 0.05 for corr, p_value in zip(local_kappa_corrs, local_kappa_ps))
                 ),
                 "photometric_proxy_positive_cluster_count": int(sum(value > 0.0 for value in proxy_corrs)),
                 "photometric_proxy_significant_cluster_count": int(
@@ -1567,6 +1861,8 @@ def run_full_experiment(
     mass_p = np.asarray([row["mass_partial_p_value"] for row in all_model_rows], dtype=float)
     sfr_corr = np.asarray([row["sfr_partial_correlation"] for row in all_model_rows], dtype=float)
     sfr_p = np.asarray([row["sfr_partial_p_value"] for row in all_model_rows], dtype=float)
+    local_kappa_corr = np.asarray([row["local_kappa_partial_correlation"] for row in all_model_rows], dtype=float)
+    local_kappa_p = np.asarray([row["local_kappa_partial_p_value"] for row in all_model_rows], dtype=float)
     proxy_corr = np.asarray([row["photometric_proxy_partial_correlation"] for row in all_model_rows], dtype=float)
     proxy_p = np.asarray([row["photometric_proxy_partial_p_value"] for row in all_model_rows], dtype=float)
     random_p = np.asarray([row["random_null_p_value"] for row in all_model_rows], dtype=float)
@@ -1597,6 +1893,9 @@ def run_full_experiment(
             "sfr_positive_run_fraction": float(np.mean(sfr_corr > 0.0)),
             "sfr_significant_run_fraction": float(np.mean((sfr_corr > 0.0) & (sfr_p < 0.05))),
             "sfr_median_partial_correlation": float(np.median(sfr_corr)),
+            "local_kappa_positive_run_fraction": float(np.mean(local_kappa_corr > 0.0)),
+            "local_kappa_significant_run_fraction": float(np.mean((local_kappa_corr > 0.0) & (local_kappa_p < 0.05))),
+            "local_kappa_median_partial_correlation": float(np.median(local_kappa_corr)),
             "photometric_proxy_positive_run_fraction": float(np.mean(proxy_corr > 0.0)),
             "photometric_proxy_significant_run_fraction": float(np.mean((proxy_corr > 0.0) & (proxy_p < 0.05))),
             "photometric_proxy_median_partial_correlation": float(np.nanmedian(proxy_corr)),
@@ -1675,6 +1974,8 @@ def run_robustness_sweep(
             mass_p = np.asarray([row["mass_partial_p_value"] for row in subset], dtype=float)
             sfr_corr = np.asarray([row["sfr_partial_correlation"] for row in subset], dtype=float)
             sfr_p = np.asarray([row["sfr_partial_p_value"] for row in subset], dtype=float)
+            local_kappa_corr = np.asarray([row["local_kappa_partial_correlation"] for row in subset], dtype=float)
+            local_kappa_p = np.asarray([row["local_kappa_partial_p_value"] for row in subset], dtype=float)
             proxy_corr = np.asarray([row["photometric_proxy_partial_correlation"] for row in subset], dtype=float)
             proxy_p = np.asarray([row["photometric_proxy_partial_p_value"] for row in subset], dtype=float)
             random_p = np.asarray([row["random_null_p_value"] for row in subset], dtype=float)
@@ -1688,6 +1989,10 @@ def run_robustness_sweep(
                 "sfr_significant_fraction": float(np.mean((sfr_corr > 0.0) & (sfr_p < 0.05))),
                 "sfr_median_partial_correlation": float(np.median(sfr_corr)),
                 "sfr_median_p_value": float(np.median(sfr_p)),
+                "local_kappa_positive_fraction": float(np.mean(local_kappa_corr > 0.0)),
+                "local_kappa_significant_fraction": float(np.mean((local_kappa_corr > 0.0) & (local_kappa_p < 0.05))),
+                "local_kappa_median_partial_correlation": float(np.median(local_kappa_corr)),
+                "local_kappa_median_p_value": float(np.median(local_kappa_p)),
                 "photometric_proxy_positive_fraction": float(np.mean(proxy_corr > 0.0)),
                 "photometric_proxy_significant_fraction": float(np.mean((proxy_corr > 0.0) & (proxy_p < 0.05))),
                 "photometric_proxy_median_partial_correlation": float(np.nanmedian(proxy_corr)),
