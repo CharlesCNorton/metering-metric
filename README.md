@@ -43,8 +43,8 @@ This repository mixes several different kinds of support, and they should not be
 - **Coq-formalized:** the root file [`meteringmetric.v`](./meteringmetric.v) currently formalizes the abstract real-analysis skeleton of the framework: proper-time vanishing, tortoise-coordinate divergence, and a WKB-style confinement barrier theorem under stated hypotheses on the activation function and metering profile.
 - **Computationally checked:** the lattice, PDE, and cosmology sections are supported by numerical experiments and symbolic derivations, not by formal proof.
 - **Hardware-backed:** the IBM Quantum section is evidence for discrete bound-state structure in the tested lattice model, not a direct measurement of the physical spacetime coupling constant.
-- **Archival observational program:** the cluster-lensing section currently runs on two HFF fields, BUFFALO v2 proxy catalogs, and 22 independent lens-model families. The sign-flip morphology survives those checks. The most stable explanatory axes are local convergence and stellar mass. A BUFFALO-based continuum proxy is stronger than the earlier HFF-matched stand-in, but its support is cluster-asymmetric rather than settled.
-- **Open empirical question:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies beyond mass and local convergence remain open.
+- **Archival observational program:** the cluster-lensing section currently runs on two HFF fields, a hardened radial-median-bandpass residual, BUFFALO v2 photometric catalogs, public MUSE spectroscopic catalogs, and 22 independent lens-model families. The sign-flip morphology survives those checks. The most stable explanatory axes are local convergence and stellar mass. Stronger external proxies do produce non-null structure, but no photometric or spectroscopic proxy yet replicates across both clusters with the same sign under the present controls.
+- **Open empirical question:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies beyond mass and local convergence remain open. The immediate observational target is same-sign conditional replication across clusters and model families.
 
 ---
 
@@ -388,13 +388,15 @@ This **convergence-divergence sign flip** is a unique morphological signature. D
 
 This analysis requires no new observations. HST, JWST, and Chandra archival data suffice.
 
-The current archival program works on the two public HFF cluster fields (`Abell 370`, `RXC J2248 / Abell S1063`) using the official HFF property catalogs, BUFFALO v2 photometric proxy catalogs, and 22 independent frontier-model `kappa` maps. The sign-flip-like morphology is reproducible across model families, so the observational question is no longer whether the morphology exists in the archive; it is which explanatory axis survives the controls.
+The current archival program works on the two public HFF cluster fields (`Abell 370`, `RXC J2248 / Abell S1063`) using the official HFF property catalogs, BUFFALO v2 photometric proxy catalogs, public MUSE Lensing Clusters spectroscopic catalogs, a hardened `radial_median_bandpass` residual construction, and 22 independent frontier-model `kappa` maps. The sign-flip-like morphology is reproducible across model families, so the observational question is no longer whether the morphology exists in the archive; it is which explanatory axis survives the controls and replicates across clusters.
 
-At present, `local_kappa` is the strongest and most stable predictor. Across the 22 model-family runs it is positive in `21/22`, significant in `19/22`, and has median partial correlation `0.3908`. Stellar mass remains a real axis as well: positive in `17/22`, significant in `8/22`, with median partial correlation `0.0945`.
+At present, `local_kappa` is the strongest and most stable predictor. Across the 22 model-family runs it is positive in `21/22`, significant in `19/22`, and has median partial correlation `0.3604`. Stellar mass remains a real axis as well: positive in `19/22`, significant in `16/22`, with median partial correlation `0.3740`. In the primary two-cluster pass, both combine at `p \approx 5.35 \times 10^{-5}`.
 
-The BUFFALO-based continuum proxy is materially better than the earlier HFF-matched continuum slope. In the 22 model-family runs it is positive in `15/22`, significant in `7/22`, with median partial correlation `0.0667`. In the primary two-cluster radial-median pass its Fisher-combined significance is `p \approx 6.4 \times 10^{-3}`. But that improvement is not yet uniform: the signal is carried mainly by `RXC J2248 / Abell S1063`, while `Abell 370` remains weak. In other words, the proxy is now a live but not yet cluster-replicated signal.
+The BUFFALO-based continuum proxy does not survive the hardened residual. Across the 22 model-family runs it is positive in `8/22`, significant in `1/22`, with median partial correlation `-0.0316`.
 
-That sets the next observational move. The immediate task is not to broaden the narrative or add clusters indiscriminately. The immediate task is to sharpen the residual construction and replace the continuum proxy with direct metallicity-capable or otherwise stronger decoherence-relevant catalogs, then rerun the same mass-controlled, radius-controlled, local-convergence-controlled model-family ensemble.
+The stronger spectroscopic pass is more informative, but it does not yet produce replication. MUSE-derived line-count and optical-complexity proxies are positive in `Abell 370` and negative in `RXC J2248 / Abell S1063` in the primary two-cluster pass. Across the 22 model-family runs, line count is positive in `14/22` and significant in `7/22`, with median partial correlation `0.1002`; optical complexity is positive in `14/22` and significant in `2/22`, with median partial correlation `0.1040`; emission strength is positive in `15/22` and significant in `2/22`, with median partial correlation `0.0786`. Those are real non-null structures, but not same-sign replication across the two clusters.
+
+That fixes the current observational program. The immediate task is to move from generic continuum and line-richness stand-ins to direct metallicity-capable or otherwise physically sharper decoherence-relevant measurements, keep the hardened residual baseline, and continue to require same-sign conditional replication against mass and `local_kappa` before treating any proxy as established.
 
 ### GW170817 Compatibility
 
@@ -439,7 +441,7 @@ The working archival lensing program now has three pieces:
 2. force every proposed proxy to compete against mass and local convergence under explicit controls,
 3. only expand the cluster sample after a proxy survives that conditional test.
 
-Within that program, the next lensing step is sharper residual construction plus direct metallicity-capable or otherwise stronger decoherence-relevant catalogs. The BUFFALO continuum proxy has improved the situation enough to justify that next step, but not enough to close the case.
+Within that program, the hardened residual baseline is now in place and the first stronger spectroscopic catalogs have been tested. The next lensing step is not looser proxy fishing; it is more physically specific proxy construction, with same-sign replication across both clusters kept as the admission criterion.
 
 ---
 
@@ -529,7 +531,7 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Photon decoupling | Model consequence of the mass-term-only coupling |
 | Decoherence rate source criterion | Proposed and computationally explored; not observationally established |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
-| Archival lensing program (2 clusters, 22 model families, BUFFALO proxy catalogs) | Morphology replicated; local convergence and mass are stable; BUFFALO continuum proxy improved but cluster-asymmetric; next step is stronger proxy catalogs plus residual hardening |
+| Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE proxy catalogs) | Morphology replicated under the hardened residual; local convergence and mass remain stable; current photometric and spectroscopic proxies show non-null but non-replicated cluster-asymmetric structure |
 | Coq formalization | Initial abstract theorem development complete; monolithic file compiles |
 | Physical $\alpha$ measurement | Open |
 

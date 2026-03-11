@@ -19,11 +19,17 @@ rxcj2248_firstpass/
 combined_firstpass/
 combined_firstpass_buffalo/
 combined_firstpass_bandpass/
+combined_firstpass_muse_bandpass/
+combined_firstpass_muse_spectroscopic_bandpass/
 robustness_sweep/
+robustness_sweep_muse_bandpass/
+robustness_sweep_muse_spectroscopic_bandpass/
 full_experiment/
 full_experiment_proxy/
 full_experiment_buffalo/
 full_experiment_bandpass/
+full_experiment_muse_bandpass/
+full_experiment_muse_spectroscopic_bandpass/
 proxy_catalog_inspect/
 tmp_inputs/
 
