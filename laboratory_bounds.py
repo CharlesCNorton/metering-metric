@@ -34,6 +34,9 @@ PI = math.pi
 NM = 1.0e-9
 MICRON = 1.0e-6
 MPA = 1.0e-3
+UPA = 1.0e-6
+NN = 1.0e-9
+PN = 1.0e-12
 
 
 @dataclass(frozen=True)
@@ -73,6 +76,8 @@ DECCA_2007_RELATIVE = RelativePressureMeasurement(
 )
 
 DEFAULT_ALPHA_TARGETS = (1.0e-1, 1.0e-2, 1.0e-3, 1.0e-4)
+DEFAULT_DIFFERENTIAL_ALPHA_TARGETS = (1.0e-2, 1.0e-3, 1.0e-4)
+DEFAULT_DIFFERENTIAL_SEPARATIONS_UM = (0.2, 0.3, 0.5)
 
 
 def perfect_conductor_casimir_pressure(separation_m: float) -> float:
@@ -257,6 +262,122 @@ def build_alpha_target_table(
     return rows
 
 
+def build_differential_design_rows(
+    separations_m: Iterable[float],
+    alpha_targets: Iterable[float],
+    anomaly_factor_at_alpha_one: float,
+    scaling_power: float,
+    plate_area_m2: float,
+    active_fill_fraction: float,
+    modulation_contrast: float,
+    force_floor_n: float,
+) -> list[dict]:
+    if plate_area_m2 <= 0.0:
+        raise ValueError("plate_area_m2 must be positive.")
+    if not (0.0 < active_fill_fraction <= 1.0):
+        raise ValueError("active_fill_fraction must lie in (0, 1].")
+    if not (0.0 < modulation_contrast <= 1.0):
+        raise ValueError("modulation_contrast must lie in (0, 1].")
+    if force_floor_n <= 0.0:
+        raise ValueError("force_floor_n must be positive.")
+
+    rows = []
+    effective_fraction = active_fill_fraction * modulation_contrast
+    for separation_m in separations_m:
+        standard_pressure = perfect_conductor_casimir_pressure(float(separation_m))
+        standard_force = standard_pressure * plate_area_m2
+        for alpha_target in alpha_targets:
+            signal_fraction = anomaly_factor_at_alpha_one * effective_fraction * alpha_target**scaling_power
+            differential_pressure = signal_fraction * standard_pressure
+            differential_force = differential_pressure * plate_area_m2
+            required_area = force_floor_n / differential_pressure if differential_pressure > 0.0 else math.inf
+            allowed_gap_drift = signal_fraction * separation_m / 4.0
+            rows.append(
+                {
+                    "separation_m": float(separation_m),
+                    "separation_um": float(separation_m / MICRON),
+                    "alpha_target": float(alpha_target),
+                    "plate_area_m2": float(plate_area_m2),
+                    "plate_area_mm2": float(plate_area_m2 * 1.0e6),
+                    "standard_casimir_pressure_pa": float(standard_pressure),
+                    "standard_casimir_force_n": float(standard_force),
+                    "effective_modulated_fraction": float(effective_fraction),
+                    "signal_fraction_vs_standard_casimir": float(signal_fraction),
+                    "differential_pressure_pa": float(differential_pressure),
+                    "differential_pressure_upa": float(differential_pressure / UPA),
+                    "differential_force_n": float(differential_force),
+                    "differential_force_pn": float(differential_force / PN),
+                    "required_common_mode_rejection": float(1.0 / signal_fraction),
+                    "uncompensated_gap_drift_limit_m": float(allowed_gap_drift),
+                    "uncompensated_gap_drift_pm": float(allowed_gap_drift / 1.0e-12),
+                    "force_floor_n": float(force_floor_n),
+                    "force_floor_pn": float(force_floor_n / PN),
+                    "minimum_plate_area_for_force_floor_m2": float(required_area),
+                    "minimum_plate_area_for_force_floor_mm2": float(required_area * 1.0e6),
+                }
+            )
+    return rows
+
+
+def build_differential_design_report(
+    separations_m: Iterable[float],
+    alpha_targets: Iterable[float],
+    anomaly_factor_at_alpha_one: float,
+    scaling_power: float,
+    plate_area_m2: float,
+    active_fill_fraction: float,
+    modulation_contrast: float,
+    force_floor_n: float,
+) -> dict:
+    rows = build_differential_design_rows(
+        separations_m=separations_m,
+        alpha_targets=alpha_targets,
+        anomaly_factor_at_alpha_one=anomaly_factor_at_alpha_one,
+        scaling_power=scaling_power,
+        plate_area_m2=plate_area_m2,
+        active_fill_fraction=active_fill_fraction,
+        modulation_contrast=modulation_contrast,
+        force_floor_n=force_floor_n,
+    )
+    keyed_rows = {(row["separation_um"], row["alpha_target"]): row for row in rows}
+    reference_key = min(keyed_rows, key=lambda key: (abs(key[0] - 0.2), abs(math.log10(key[1]) + 3.0)))
+    reference_row = keyed_rows[reference_key]
+    return {
+        "benchmark_model": {
+            "anomaly_factor_at_alpha_one": float(anomaly_factor_at_alpha_one),
+            "scaling_power": float(scaling_power),
+            "statement": (
+                "Differential design targets inherit the same benchmark anomaly model used in the Casimir null report."
+            ),
+        },
+        "design_inputs": {
+            "plate_area_m2": float(plate_area_m2),
+            "plate_area_mm2": float(plate_area_m2 * 1.0e6),
+            "active_fill_fraction": float(active_fill_fraction),
+            "modulation_contrast": float(modulation_contrast),
+            "effective_modulated_fraction": float(active_fill_fraction * modulation_contrast),
+            "force_floor_n": float(force_floor_n),
+            "force_floor_pn": float(force_floor_n / PN),
+            "separations_um": [float(separation_m / MICRON) for separation_m in separations_m],
+            "alpha_targets": [float(alpha_target) for alpha_target in alpha_targets],
+        },
+        "reference_design_point": reference_row,
+        "rows": rows,
+        "executive_summary": {
+            "recommended_reading": (
+                "For the benchmark family now in the repository, an active-vs-inert Casimir differential becomes an "
+                "O(10 uPa) problem at alpha ~ 1e-3 near 0.2 um."
+            ),
+            "reference_statement": (
+                f"At {reference_row['separation_um']:.3g} um and alpha = {reference_row['alpha_target']:.3g}, "
+                f"the benchmark differential is {reference_row['differential_pressure_upa']:.6g} uPa "
+                f"and {reference_row['differential_force_pn']:.6g} pN for a "
+                f"{reference_row['plate_area_mm2']:.6g} mm^2 active area."
+            ),
+        },
+    }
+
+
 def build_casimir_benchmark_report(
     anomaly_factor_at_alpha_one: float,
     scaling_power: float,
@@ -354,6 +475,20 @@ def command_casimir_benchmark_report(args: argparse.Namespace) -> None:
     write_json_report(report, args.out)
 
 
+def command_casimir_differential_design(args: argparse.Namespace) -> None:
+    report = build_differential_design_report(
+        separations_m=[value * MICRON for value in args.separations_um],
+        alpha_targets=args.alpha_targets,
+        anomaly_factor_at_alpha_one=args.anomaly_factor_at_alpha_one,
+        scaling_power=args.scaling_power,
+        plate_area_m2=args.plate_area_mm2 * 1.0e-6,
+        active_fill_fraction=args.active_fill_fraction,
+        modulation_contrast=args.modulation_contrast,
+        force_floor_n=args.force_floor_pn * PN,
+    )
+    write_json_report(report, args.out)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Laboratory-side benchmark bounds for the metering-metric coupling.",
@@ -371,6 +506,31 @@ def build_parser() -> argparse.ArgumentParser:
     decca.add_argument("--alpha-targets", type=float, nargs="+", default=list(DEFAULT_ALPHA_TARGETS))
     decca.add_argument("--out", type=str, default=None)
     decca.set_defaults(func=command_casimir_benchmark_report)
+
+    differential = subparsers.add_parser(
+        "casimir-differential-design",
+        help="Build an active-vs-inert Casimir differential design target report.",
+    )
+    differential.add_argument("--anomaly-factor-at-alpha-one", type=float, default=16.0)
+    differential.add_argument("--scaling-power", type=float, default=2.0)
+    differential.add_argument(
+        "--separations-um",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_DIFFERENTIAL_SEPARATIONS_UM),
+    )
+    differential.add_argument(
+        "--alpha-targets",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_DIFFERENTIAL_ALPHA_TARGETS),
+    )
+    differential.add_argument("--plate-area-mm2", type=float, default=1.0)
+    differential.add_argument("--active-fill-fraction", type=float, default=1.0)
+    differential.add_argument("--modulation-contrast", type=float, default=1.0)
+    differential.add_argument("--force-floor-pn", type=float, default=10.0)
+    differential.add_argument("--out", type=str, default=None)
+    differential.set_defaults(func=command_casimir_differential_design)
 
     return parser
 

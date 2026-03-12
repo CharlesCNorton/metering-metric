@@ -44,7 +44,7 @@ This repository mixes several different kinds of support, and they should not be
 - **Coq-formalized:** the root file [`meteringmetric.v`](./meteringmetric.v) currently formalizes the abstract real-analysis skeleton of the framework: proper-time vanishing, tortoise-coordinate divergence, and a WKB-style confinement barrier theorem under stated hypotheses on the activation function and metering profile.
 - **Computationally checked:** the lattice, PDE, and cosmology sections are supported by numerical experiments and symbolic derivations, not by formal proof.
 - **Hardware-backed:** the IBM Quantum section is evidence for discrete bound-state structure in the tested lattice model, not a direct measurement of the physical spacetime coupling constant.
-- **Measurement-anchored laboratory benchmark:** [`laboratory_bounds.py`](./laboratory_bounds.py) now maps the repository's current Casimir-scale anomaly benchmark onto published precision Casimir-pressure nulls. Under the present benchmark model, the strongest executed laboratory null in the repository is a Casimir bound of $\alpha \leq 6.79 \times 10^{-3}$, with a canonical report in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json).
+- **Measurement-anchored laboratory benchmark:** [`laboratory_bounds.py`](./laboratory_bounds.py) now maps the repository's current Casimir-scale anomaly benchmark onto published precision Casimir-pressure nulls and a first active-vs-inert differential design target. Under the present benchmark model, the strongest executed laboratory null in the repository is a Casimir bound of $\alpha \leq 6.79 \times 10^{-3}$, with canonical reports in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json) and [`laboratory_reports/casimir-differential-design.json`](./laboratory_reports/casimir-differential-design.json).
 - **Archival observational program:** the cluster-lensing section currently runs on two HFF fields, a hardened radial-median-bandpass residual, BUFFALO v2 photometric catalogs, public MUSE spectroscopic catalogs, deeper external spectroscopy for membership hardening, public `MUSE-DEEP` core-cube extractions, and 22 independent lens-model families. The sign-flip morphology survives those checks. The most stable explanatory axes are local convergence and stellar mass. Generic spectroscopic structure, line-ratio proxies, first strong-line metallicity estimators, and the current public matched-depth core-cube route do not yield a same-sign replicated abundance-style proxy across both clusters under the present controls.
 - **Open empirical question:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies beyond mass and local convergence remain open. The observational proxy lane is exhausted on current public data. Two later observational pursuits remain well-defined: redder symmetric spectroscopy for both clusters with usable `Halpha`, `[N II]`, `Hbeta`, and `[O III]` coverage, and direct per-galaxy abundance tables with one-to-one mapping into the HFF member catalogs. Until such data exist, the active focus shifts to deriving the 3+1D lensing observable from the field equations.
 
@@ -299,7 +299,7 @@ Four current handles on the coupling constant $\alpha$:
 
 **2. Internal weak-energy benchmark:** The metric requires negative energy density inside the metered region at ~16x the Casimir scale when $\alpha = 1$. Requiring $|T_{00}| < E_{\text{Casimir}}$ gives $\alpha < 0.133$.
 
-**3. Executed Casimir benchmark null:** The repository now carries an explicit laboratory workbench in [`laboratory_bounds.py`](./laboratory_bounds.py), with the canonical report in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json). Using the same Casimir-scale benchmark amplitude as above, together with quadratic weak-coupling scaling, the strongest current pressure-null anchor in the report is the Decca et al. 2003 parallel-plate measurement at `0.2 um`, which gives
+**3. Executed Casimir benchmark null:** The repository now carries an explicit laboratory workbench in [`laboratory_bounds.py`](./laboratory_bounds.py), with the canonical null report in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json). Using the same Casimir-scale benchmark amplitude as above, together with quadratic weak-coupling scaling, the strongest current pressure-null anchor in the report is the Decca et al. 2003 parallel-plate measurement at `0.2 um`, which gives
 
 $$\alpha \leq 6.79 \times 10^{-3}.$$
 
@@ -314,9 +314,17 @@ At the `0.2 um` reference separation used in the report, this benchmark model im
 
 So the first hard laboratory cutoff now exists in the repository, and it is already stronger than the older internal WEC consistency cutoff.
 
+The same workbench now also carries the first active-vs-inert differential design report in [`laboratory_reports/casimir-differential-design.json`](./laboratory_reports/casimir-differential-design.json). At the current reference design point:
+
+- separation `0.2 um`
+- active area `1 mm^2`
+- target `\alpha = 10^{-3}`
+
+the benchmark differential is `13.0 uPa` or `13.0 pN`, with required common-mode rejection `6.25 x 10^4`. If uncompensated gap drift were allowed to fake the whole signal, the corresponding gap-stability scale would be `0.8 pm`.
+
 **4. Dimensional analysis:** In SI units, $\alpha_{\text{SI}} \sim \ell_P^3 \sim 4 \times 10^{-105}$ m$^3$/bit. In a laboratory ($\mu \sim 10^{26}$ bits/m$^3$): $\alpha_{\text{SI}} \cdot \mu \sim 4 \times 10^{-79}$.
 
-**Interpretation:** The hardware test supports the lattice-model claim that a $1/N^2$ potential can produce the observed bound-state spectral structure. The Casimir workbench adds the first executed measurement-anchored laboratory null bound in the repository. But the lattice encodes $\alpha$ in circuit parameters, and the current Casimir bound still inherits the repository's benchmark anomaly model rather than a completed first-principles laboratory derivation. A direct physical extraction of spacetime $\alpha$ remains open.
+**Interpretation:** The hardware test supports the lattice-model claim that a $1/N^2$ potential can produce the observed bound-state spectral structure. The Casimir workbench now adds both the first executed measurement-anchored laboratory null bound and the first concrete differential design target in the repository. But the lattice encodes $\alpha$ in circuit parameters, and the current Casimir program still inherits the repository's benchmark anomaly model rather than a completed first-principles laboratory derivation. A direct physical extraction of spacetime $\alpha$ remains open.
 
 ---
 
@@ -482,7 +490,7 @@ A quantum system under spatially varying measurement strength exhibits discrete 
 
 ### B. Anomalous Casimir Effect
 
-The WEC violation predicts an additional negative-energy contribution in regions of high metering density. That lane is no longer just a proposal. A first executable laboratory workbench now exists in [`laboratory_bounds.py`](./laboratory_bounds.py), with the canonical report in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json).
+The WEC violation predicts an additional negative-energy contribution in regions of high metering density. That lane is no longer just a proposal. A first executable laboratory workbench now exists in [`laboratory_bounds.py`](./laboratory_bounds.py), with canonical reports in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json) and [`laboratory_reports/casimir-differential-design.json`](./laboratory_reports/casimir-differential-design.json).
 
 Under the repository's current benchmark model:
 
@@ -490,7 +498,9 @@ Under the repository's current benchmark model:
 - a signal at $\alpha = 10^{-2}$ would require an active-vs-inert pressure difference of about `1.30 mPa` at `0.2 um`
 - a signal at $\alpha = 10^{-3}$ would require about `13.0 uPa` at the same separation
 
-So this remains the shortest current path to a hard physical bound, but it is no longer vague. The next laboratory move is a purpose-built active-vs-inert Casimir differential with sub-`10 uPa` reach if the target is to penetrate below the `10^-3` regime in the present benchmark family.
+The first reference differential design is now explicit as well: `13.0 pN` at `0.2 um` for a `1 mm^2` active area when $\alpha = 10^{-3}`, together with common-mode rejection `6.25 x 10^4` and uncompensated gap-drift tolerance `0.8 pm`.
+
+So this remains the shortest current path to a hard physical bound, but it is no longer vague. The next laboratory move is a purpose-built active-vs-inert Casimir differential with `O(10 uPa)` pressure reach and `O(10 pN)` force reach if the target is to penetrate the `10^-3` regime in the present benchmark family.
 
 ### C. Cosmological Metering Signature
 
@@ -545,7 +555,7 @@ The Einstein-backreaction branch is in better shape. In the exterior it is a GR-
 
 ### The Coupling Constant
 
-$\alpha$ is the central unknown. The hardware fit ($\alpha \approx 1.16$) applies to the lattice model, not to spacetime. The internal WEC benchmark ($\alpha < 0.133$) is a consistency cutoff, not a laboratory result. The repository now also contains a first executed measurement-anchored Casimir null bound, with strongest current benchmark value $\alpha \leq 6.79 \times 10^{-3}$ under the present anomaly model. The dimensional estimate ($\alpha_{\text{SI}} \sim \ell_P^3$) still suggests the physical coupling may be extraordinarily small. All cosmological predictions depend on $\alpha$, and a direct first-principles physical extraction of $\alpha$ remains open.
+$\alpha$ is the central unknown. The hardware fit ($\alpha \approx 1.16$) applies to the lattice model, not to spacetime. The internal WEC benchmark ($\alpha < 0.133$) is a consistency cutoff, not a laboratory result. The repository now also contains a first executed measurement-anchored Casimir null bound, with strongest current benchmark value $\alpha \leq 6.79 \times 10^{-3}$ under the present anomaly model, plus a first explicit active-vs-inert differential design target at the `10^{-3}` level. The dimensional estimate ($\alpha_{\text{SI}} \sim \ell_P^3$) still suggests the physical coupling may be extraordinarily small. All cosmological predictions depend on $\alpha$, and a direct first-principles physical extraction of $\alpha$ remains open.
 
 ### Asymptotic Geometry
 
@@ -632,7 +642,7 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
 | Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; the public-data proxy lane is exhausted without a replicated abundance-style signal; active focus shifts to the 3+1D lensing derivation |
 | Coq formalization | Initial abstract theorem development complete; monolithic file compiles |
-| Physical $\alpha$ laboratory bound | First Casimir benchmark null executed; strongest current benchmark cutoff $\alpha \leq 6.79 \times 10^{-3}$; direct first-principles measurement remains open |
+| Physical $\alpha$ laboratory program | Casimir benchmark null executed; strongest current benchmark cutoff $\alpha \leq 6.79 \times 10^{-3}$; first active-vs-inert differential design target defined; direct first-principles measurement remains open |
 
 ---
 
