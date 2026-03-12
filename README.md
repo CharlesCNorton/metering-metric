@@ -44,7 +44,7 @@ This repository mixes several different kinds of support, and they should not be
 - **Coq-formalized:** the root file [`meteringmetric.v`](./meteringmetric.v) currently formalizes the abstract real-analysis skeleton of the framework: proper-time vanishing, tortoise-coordinate divergence, and a WKB-style confinement barrier theorem under stated hypotheses on the activation function and metering profile.
 - **Computationally checked:** the lattice, PDE, and cosmology sections are supported by numerical experiments and symbolic derivations, not by formal proof.
 - **Hardware-backed:** the IBM Quantum section is evidence for discrete bound-state structure in the tested lattice model, not a direct measurement of the physical spacetime coupling constant.
-- **Measurement-anchored laboratory benchmark:** [`laboratory_bounds.py`](./laboratory_bounds.py) now maps the repository's current Casimir-scale anomaly benchmark onto published precision Casimir-pressure nulls, a first active-vs-inert differential design target, and a first geometry-dependent planar slab signal model sourced by the screened metering field equation. Under the present benchmark model, the strongest executed laboratory null in the repository is a Casimir bound of $\alpha \leq 6.79 \times 10^{-3}$, with canonical reports in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json), [`laboratory_reports/casimir-differential-design.json`](./laboratory_reports/casimir-differential-design.json), and [`laboratory_reports/casimir-planar-slab-geometry.json`](./laboratory_reports/casimir-planar-slab-geometry.json). In the current slab model, the interaction law is exact and the remaining laboratory unknown is the source-normalization bridge; the naive bridge is not viable at the present benchmark scale.
+- **Measurement-anchored laboratory benchmark:** [`laboratory_bounds.py`](./laboratory_bounds.py) now maps the repository's current Casimir-scale anomaly benchmark onto published precision Casimir-pressure nulls, a first active-vs-inert differential design target, a first geometry-dependent planar slab signal model sourced by the screened metering field equation, and a first explicit source-bridge report. Under the present benchmark model, the strongest executed laboratory null in the repository is a Casimir bound of $\alpha \leq 6.79 \times 10^{-3}$, with canonical reports in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json), [`laboratory_reports/casimir-differential-design.json`](./laboratory_reports/casimir-differential-design.json), [`laboratory_reports/casimir-planar-slab-geometry.json`](./laboratory_reports/casimir-planar-slab-geometry.json), and [`laboratory_reports/casimir-source-bridge-report.json`](./laboratory_reports/casimir-source-bridge-report.json). In the current slab model, the interaction law is exact, the naive bridge is not viable, and the first viable bridge family is now a Planck-tick occupancy reduction from dynamic activity density to static screened source.
 - **Archival observational program:** the cluster-lensing section currently runs on two HFF fields, a hardened radial-median-bandpass residual, BUFFALO v2 photometric catalogs, public MUSE spectroscopic catalogs, deeper external spectroscopy for membership hardening, public `MUSE-DEEP` core-cube extractions, and 22 independent lens-model families. The sign-flip morphology survives those checks. The most stable explanatory axes are local convergence and stellar mass. Generic spectroscopic structure, line-ratio proxies, first strong-line metallicity estimators, and the current public matched-depth core-cube route do not yield a same-sign replicated abundance-style proxy across both clusters under the present controls.
 - **Open empirical question:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies beyond mass and local convergence remain open. The observational proxy lane is exhausted on current public data. Two later observational pursuits remain well-defined: redder symmetric spectroscopy for both clusters with usable `Halpha`, `[N II]`, `Hbeta`, and `[O III]` coverage, and direct per-galaxy abundance tables with one-to-one mapping into the HFF member catalogs. Until such data exist, the active focus shifts to deriving the 3+1D lensing observable from the field equations.
 
@@ -56,7 +56,7 @@ The repository now supports a cleaner claim hierarchy:
 
 - **Established within the current project:** the mass-gap mechanism is the working core. The abstract theorem spine in [`meteringmetric.v`](./meteringmetric.v) supports horizon formation, confinement-barrier structure, and proper-time vanishing in the present theorem-level scope. The lattice and hardware program supports discrete bound-state structure for the tested $1/N^2$ potential. The archival lensing program supports a reproducible sign-flip-like residual morphology, with local convergence and stellar mass as the stable explanatory axes on current public data.
 - **Supported but not finished:** a viable 3+1D Einstein-backreaction branch exists in [`three_plus_one_lensing.py`](./three_plus_one_lensing.py). In that branch, raw convergence remains nonnegative in the tested cluster-style maps, but sign-changing residual morphology appears in multi-component, HFF-member, and calibrated member-plus-envelope geometries. Direct archive comparison improves under that calibration, and a rigid-alignment audit shows that part of the remaining mismatch is registration-sensitive.
-- **Open:** a full 3+1D observable derivation is still needed. The current theory program has not yet turned the viable branch into a quantitatively competitive field-level match to the archival residual maps. A continuum finite-dimensionality theorem remains open. A direct first-principles physical measurement of the spacetime coupling $\alpha$ remains open, even though the repository now contains a measurement-anchored Casimir benchmark null bound, a differential design target, and an exact planar screened-slab interaction law. On the laboratory side, the remaining gap has been narrowed to source normalization rather than force scaling, and the naive source bridge is not viable at the current benchmark level. On the observational side, the next clean empirical step would require redder symmetric spectroscopy or direct abundance tables for both clusters.
+- **Open:** a full 3+1D observable derivation is still needed. The current theory program has not yet turned the viable branch into a quantitatively competitive field-level match to the archival residual maps. A continuum finite-dimensionality theorem remains open. A direct first-principles physical measurement of the spacetime coupling $\alpha$ remains open, even though the repository now contains a measurement-anchored Casimir benchmark null bound, a differential design target, an exact planar screened-slab interaction law, and a first viable source-bridge family. On the laboratory side, the remaining gap is no longer force scaling and no longer an unconstrained normalization constant; it is the covariant fixation of the occupancy bridge parameters $(\eta_J, \tau_p, L_\perp)$. On the observational side, the next clean empirical step would require redder symmetric spectroscopy or direct abundance tables for both clusters.
 - **Not supported yet:** the repository does **not** currently support the stronger claim that the archival cluster morphology tracks decoherence-rate or abundance-style proxies beyond mass and local convergence. It does **not** yet support a raw 3+1D negative-$\kappa$ prediction in the viable branch. It does **not** yet support treating the explicit photon-sector branch as the mainline completion.
 
 This ladder is the current intended reading of the project: the core metering mechanism remains alive, the observational proxy claim has not cleared the bar, and the active bridge to reality is the 3+1D Einstein-backreaction lensing program.
@@ -128,6 +128,8 @@ The effective potential $V_{\text{eff}}(x) = 1/N(x)^2$ confines temporal oscilla
 
 These finite counts are numerical results for the tested truncations and dimensional models. A continuum finite-dimensionality theorem remains open.
 
+The current same-lapse massive-sector workbench now gives explicit turning thresholds, barrier actions, and delay integrals rather than only qualitative confinement statements.
+
 ### Theorem 3: Proper Time Vanishing
 
 For a static observer at position $x$:
@@ -160,20 +162,26 @@ The metering field equation has a source term $J(x)$ that determines where $\mu$
 | Structured record capacity | 0 | ~0 | large | Yes |
 | Decoherence rate density | 0 | tiny | large | Yes |
 
-### Recommended: Decoherence Rate Density
+### Recommended: Decoherence Activity Density
 
-$$J(x) = \alpha_J \sum_{\text{massive } i} n_i(x) \cdot \gamma_{D,i}(x)$$
+Define the dynamic metering-activity density
 
-where $n_i$ is the number density of massive species $i$ and $\gamma_{D,i}$ is the local decoherence rate.
+$$R(x) = \sum_{\text{massive } i} n_i(x) \cdot \gamma_{D,i}(x)$$
+
+where $n_i$ is the number density of massive species $i$ and $\gamma_{D,i}$ is the local decoherence rate. The source entering the static screened field equation is not raw $R$ itself but the reduced static source
+
+$$J(x) = \kappa_J(x)\,R(x), \qquad \kappa_J(x) = \eta_J \frac{\tau_p(x)}{L_\perp(x)^2}.$$
+
+Here $\tau_p$ is the persistence time of a metering event in the static source and $L_\perp$ is the transverse coarse-graining scale of that reduction.
 
 **Why this criterion:**
 
-1. **No free parameters beyond $\alpha$.** The entropy production criterion requires an additional coupling $\beta$; the structured record criterion requires an arbitrary persistence threshold $\tau_{\text{threshold}}$.
+1. **The dynamic source is fixed by local activity.** The entropy production criterion requires an additional coupling $\beta$; the structured record criterion requires an arbitrary persistence threshold $\tau_{\text{threshold}}$. In the decoherence-activity picture, the dynamical source density itself is fixed by local rate density, and the remaining bridge to the static screened source is now explicit and testable.
 2. **Consistent with photon decoupling.** Photons don't decohere in vacuum. The CMB photon bath is already at thermal equilibrium. Only massive degrees of freedom under environmental monitoring contribute.
 3. **Physically grounded.** Decoherence is measurement in the decoherence program. The framework claims duration requires measurement. The source of metering should be the rate of measurement events.
 4. **Correct hierarchy:**
 
-| Environment | $\gamma_D$ (s$^{-1}$) | $\rho_{\text{states}}$ (m$^{-3}$) | $J$ (m$^{-3}$ s$^{-1}$) |
+| Environment | $\gamma_D$ (s$^{-1}$) | $\rho_{\text{states}}$ (m$^{-3}$) | $R = \sum n_i\gamma_{D,i}$ (m$^{-3}$ s$^{-1}$) |
 |-------------|------------------------|--------------------------------------|---------------------------|
 | Lab (condensed matter) | $10^{12}$ | $10^{28}$ | $10^{40}$ |
 | Stellar core | $10^{15}$ | $10^{31}$ | $10^{46}$ |
@@ -182,6 +190,24 @@ where $n_i$ is the number density of massive species $i$ and $\gamma_{D,i}$ is t
 | IGM | $10^{-15}$ | $1$ | $10^{-15}$ |
 | Cosmic void (baryons) | $10^{-20}$ | $0.1$ | $10^{-21}$ |
 | CMB photon field | $0$ | $0$ (massless) | $0$ |
+
+The laboratory workbench now fixes the bridge scale at the reference slab benchmark point. In [`laboratory_reports/casimir-source-bridge-report.json`](./laboratory_reports/casimir-source-bridge-report.json), the exact slab law selects
+
+$$\kappa_J \approx 1.90 \times 10^{-32}\ \text{s m}^{-2}.$$
+
+That means the naive raw-rate identification is out. The first viable bridge family is instead a Planck-tick occupancy reduction,
+
+$$J(x) = \eta_J \frac{t_P}{L_\perp(x)^2} R(x).$$
+
+For the current slab geometry, taking $L_\perp = \ell_s = 0.2\,\mu\text{m}$ requires
+
+$$\eta_J \approx 1.41 \times 10^{-2},$$
+
+while taking $\eta_J = 1$ instead selects
+
+$$L_\perp \approx 1.68\,\mu\text{m}.$$
+
+So the bridge is no longer an arbitrary missing constant. It has been reduced to a narrow occupancy-style family that now needs to be fixed by the covariant theory.
 
 5. **Reduces to entropy production in the thermodynamic limit** via the fluctuation-dissipation theorem.
 
@@ -324,7 +350,7 @@ the benchmark differential is `13.0 uPa` or `13.0 pN`, with required common-mode
 
 **4. Dimensional analysis:** In SI units, $\alpha_{\text{SI}} \sim \ell_P^3 \sim 4 \times 10^{-105}$ m$^3$/bit. In a laboratory ($\mu \sim 10^{26}$ bits/m$^3$): $\alpha_{\text{SI}} \cdot \mu \sim 4 \times 10^{-79}$.
 
-**Interpretation:** The hardware test supports the lattice-model claim that a $1/N^2$ potential can produce the observed bound-state spectral structure. The Casimir workbench now adds the first executed measurement-anchored laboratory null bound, the first concrete differential design target, and the first geometry-dependent slab-field signal model in the repository. The planar interaction shape is now exact within the linear screened slab model, and the finite-domain solver agrees with that closed form at the `10^{-5}` level. What remains open is the physical source normalization that converts laboratory metering density into the effective slab source strength entering that exact interaction law, and the naive source bridge is already excluded at the current benchmark scale. A direct physical extraction of spacetime $\alpha$ therefore remains open.
+**Interpretation:** The hardware test supports the lattice-model claim that a $1/N^2$ potential can produce the observed bound-state spectral structure. The Casimir workbench now adds the first executed measurement-anchored laboratory null bound, the first concrete differential design target, the first geometry-dependent slab-field signal model in the repository, and the first explicit source-bridge report. The planar interaction shape is now exact within the linear screened slab model, and the finite-domain solver agrees with that closed form at the `10^{-5}` level. The raw dynamic activity density $R$ is not itself the static screened source, and the naive bridge is already excluded at the current benchmark scale. The current live bridge family is instead occupancy-style, with $J = \eta_J (\tau_p/L_\perp^2) R$ and a Planck-tick specialization that already lands near order-unity structure. A direct physical extraction of spacetime $\alpha$ therefore remains open, but it is now constrained to a much narrower source-bridge problem. The active separation of lattice-fit, continuum, and laboratory couplings is now built directly into the repository reading itself: $\alpha_{\text{lattice}} = 1.165$, the internal continuum consistency cutoff is `0.133`, and the strongest current benchmark laboratory null is `6.79 x 10^{-3}`.
 
 ---
 
@@ -339,6 +365,8 @@ $$S_\mu = \int \left[ \frac{(\partial_t \mu)^2}{2N} - \frac{N(\partial_x \mu)^2}
 The Euler-Lagrange equation:
 
 $$\partial_t^2 \mu = N^2 \partial_x^2 \mu + \frac{N'}{N}(\partial_t \mu)^2 + N N'(\partial_x \mu)^2 - N^2 V'(\mu) + N^2 J$$
+
+Here $J$ is the reduced static screened source, not the raw dynamical activity density $R$.
 
 **Propagation speed of $\mu$:** $c_\mu = N(\mu)$. In metered regions ($\mu \gg 1$), $c_\mu \to 1$. In unmetered regions ($\mu \to 0$), $c_\mu \to 0$. The metering density obeys the same causal structure as matter. Horizons are self-reinforcing: once $N = 0$, no $\mu$ dynamics can penetrate.
 
@@ -414,6 +442,8 @@ Over the studied parameter range, the delay appears **binary rather than continu
 
 In this model, that sharpness is a consequence of the phase-transition-like behavior of the void solution.
 
+The epsilon-regularized rerun is now explicit in the current workbench. For the reference same-lapse branch with rest mass `0.1` and conserved energy `8`, increasing $\epsilon$ from `0` to `10^{-2}` drives the WKB action from `2.25544 x 10^5` down to `1.15547 x 10^1` and the tortoise integral from `2.25548 x 10^6` down to `2.53388 x 10^2`, while the bridged 120 Mpc void reference remains below the finite-energy turning threshold (`N_{\text{void}} \approx 0.0100007 < 0.0125` at $\epsilon = 10^{-2}`). So the regularized branch softens the barrier sharply without automatically erasing the horizon-like regime.
+
 ### Differential Gravitational Lensing
 
 In the reduced 1+1D metering geometry, the Ricci scalar $R(x)$ changes sign at the metering boundary:
@@ -460,6 +490,8 @@ The alignment audit sharpens that picture further. Allowing a small rigid regist
 
 That changes the theoretical read again. The reduced 1+1 sign flip has still **not** been lifted into a raw 3+1D negative-$\kappa$ prediction of the viable branch. A sign-changing **residual** morphology can now arise within the Einstein-backreaction mainline not only in toy composites and first-pass HFF member geometries, but in a partially calibrated member-plus-envelope geometry that improves the direct archival comparison across both clusters and the 22-model family ensemble. What has **not** happened is a clean pixelwise lock, even after a rigid registration audit. So the immediate theory task is narrower now. It is no longer to ask whether multi-component geometry matters, and no longer simply to add a smooth background. It is to calibrate the viable Einstein branch beyond this first member-plus-envelope stage: amplitude laws, smooth-halo shape, line-of-sight structure, and other cluster-scale degrees of freedom, while also separating physical miscentering from purely comparative registration effects.
 
+The current local 22-family calibration search is now explicit. The best branch in [`theory_maps/hff-ensemble-calibration-search-summary.json`](./theory_maps/hff-ensemble-calibration-search-summary.json) and the full-resolution rerun in [`theory_maps/hff-ensemble-calibrated-member-envelope-summary.json`](./theory_maps/hff-ensemble-calibrated-member-envelope-summary.json) is a displaced member-plus-envelope Einstein model with `softened_nfw` source profile, smooth-envelope amplitude fraction `0.35`, size multiplier `5.0`, position shrink `0.75`, and a member-frame shift of `10 arcsec` along the principal axis. In the full-resolution 22-model summary, that branch reaches median resolved-sign agreement `0.498`, negative Jaccard `0.236`, harmonic `L2 = 0.157`, and member pass agreement `0.808`. Under rigid comparison alignment those medians move to `0.519`, `0.230`, `0.146`, and `0.85`, respectively, while pixel Pearson remains weak. So the viable branch is now materially calibrated, but it is still stronger on residual class and member-level ordering than on pixelwise field lock.
+
 **Observational target:** Galaxy cluster lensing residuals. The archival program tests whether the sign-flip-like morphology survives model-family variation and whether any decoherence-relevant proxy carries conditional signal beyond stellar mass and local convergence. That is a morphology-and-confounder program, not yet a completed derivation of a direct photon-sector effect.
 
 The current archival program works on the two public HFF cluster fields (`Abell 370`, `RXC J2248 / Abell S1063`) using the official HFF property catalogs, BUFFALO v2 photometric proxy catalogs, public MUSE Lensing Clusters spectroscopic catalogs, a hardened `radial_median_bandpass` residual construction, deeper external spectroscopy for membership hardening, public `MUSE-DEEP` core-cube extractions, and 22 independent frontier-model `kappa` maps. The sign-flip-like morphology is reproducible across model families, so the observational question is no longer whether the morphology exists in the archive; it is which explanatory axis survives the controls and replicates across clusters.
@@ -478,7 +510,7 @@ The public matched-depth core-cube route has now been tested as well. Secure-red
 
 GW170817/GRB 170817A constrains $|c_{\text{GW}} - c_{\text{photon}}|/c < 10^{-15}$.
 
-Since the metering coupling enters through the mass term, all massless fields (photons, gravitons, gluons) decouple. Gravitational waves propagate at $c$ everywhere, regardless of $\mu$. Within this mass-term-only coupling model, the GW170817 constraint is satisfied for any $(m, \alpha)$, with no parameter tuning required.
+Since the metering coupling enters through the mass term, all massless fields (photons, gravitons, gluons) decouple. Gravitational waves propagate at $c$ everywhere, regardless of $\mu$. Within this mass-term-only coupling model, the GW170817 constraint is satisfied for any $(m, \alpha)$, with no parameter tuning required. The explicit photon-sector comparison branch is retained only as a constrained counterexample and not as the current mainline.
 
 ---
 
@@ -490,7 +522,7 @@ A quantum system under spatially varying measurement strength exhibits discrete 
 
 ### B. Anomalous Casimir Effect
 
-The WEC violation predicts an additional negative-energy contribution in regions of high metering density. That lane is no longer just a proposal. A first executable laboratory workbench now exists in [`laboratory_bounds.py`](./laboratory_bounds.py), with canonical reports in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json) and [`laboratory_reports/casimir-differential-design.json`](./laboratory_reports/casimir-differential-design.json).
+The WEC violation predicts an additional negative-energy contribution in regions of high metering density. That lane is no longer just a proposal. A first executable laboratory workbench now exists in [`laboratory_bounds.py`](./laboratory_bounds.py), with canonical reports in [`laboratory_reports/casimir-benchmark-report.json`](./laboratory_reports/casimir-benchmark-report.json), [`laboratory_reports/casimir-differential-design.json`](./laboratory_reports/casimir-differential-design.json), [`laboratory_reports/casimir-planar-slab-geometry.json`](./laboratory_reports/casimir-planar-slab-geometry.json), and [`laboratory_reports/casimir-source-bridge-report.json`](./laboratory_reports/casimir-source-bridge-report.json).
 
 Under the repository's current benchmark model:
 
@@ -509,9 +541,24 @@ The finite-domain numerical solver in the workbench reproduces that closed form 
 - at `0.3 um`, the geometry modifier is `3.07` relative to the pure benchmark extrapolation
 - at `0.5 um`, the geometry modifier is `8.72`
 
-The remaining laboratory unknown is no longer hidden in a generic calibration constant. For the current default slab geometry, matching the `0.2 um` reference amplitude requires an effective slab source strength `J_0 \approx 1.90 x 10^8` in the screened-field equation, which corresponds to a conversion factor `\approx 1.90 x 10^{-32}` relative to the repository's laboratory decoherence-rate-density scale `10^40`. Relative to the naive causal screening scale `1/(c \ell_s)`, that required conversion is smaller by a factor `\approx 1.14 x 10^{-30}`. If that bridge were interpreted as a simple persistence-time law `\kappa = \tau / \ell_s^2`, the implied timescale would be `\tau \approx 7.60 x 10^{-46} s \approx 1.41 x 10^{-2} t_P`. So the naive source interpretation is not merely incomplete; in this form it is effectively ruled out.
+The remaining laboratory unknown is no longer hidden in a generic calibration constant. For the current default slab geometry, matching the `0.2 um` reference amplitude requires an effective slab source strength `J_0 \approx 1.90 x 10^8` in the screened-field equation, which corresponds to a bridge conversion
 
-So this remains the shortest current path to a hard physical bound, but it is no longer vague. The next laboratory move is a purpose-built active-vs-inert Casimir differential with `O(10 uPa)` pressure reach and `O(10 pN)` force reach near `0.2 um`, together with wider-gap follow-up runs where the exact screened-slab law predicts a slower falloff than the raw `1/a^4` benchmark guess, and a final source-normalization derivation that turns the current `J_0` conversion factor into a true physical prediction.
+$$\kappa_J \approx 1.90 \times 10^{-32}\ \text{s m}^{-2}$$
+
+relative to the repository's laboratory decoherence-activity scale `R_lab ~ 10^40`. Relative to the naive causal screening scale `1/(c \ell_s)`, that required conversion is smaller by a factor `\approx 1.14 x 10^{-30}`. So the naive source interpretation is not merely incomplete; in this form it is effectively ruled out.
+
+The new source-bridge report shows that the exact slab law already selects a much sharper alternative. If the static source is written as
+
+$$J(x) = \eta_J \frac{\tau_p}{L_\perp^2} R(x),$$
+
+then a Planck-tick occupancy bridge with $\tau_p = t_P$ gives two clean reference statements:
+
+- if $L_\perp = \ell_s = 0.2\,\mu\text{m}$, the required bridge efficiency is $\eta_J \approx 1.41 \times 10^{-2}$
+- if $\eta_J = 1$, the required transverse coarse-graining scale is $L_\perp \approx 1.68\,\mu\text{m}$
+
+That does not finish the covariant source theory, but it does move the bridge from an impossible suppression problem to a narrow and structurally specific occupancy family.
+
+So this remains the shortest current path to a hard physical bound, but it is no longer vague. The next laboratory move is a purpose-built active-vs-inert Casimir differential with `O(10 uPa)` pressure reach and `O(10 pN)` force reach near `0.2 um`, together with wider-gap follow-up runs where the exact screened-slab law predicts a slower falloff than the raw `1/a^4` benchmark guess, and a covariant fixation of the occupancy bridge parameters $(\eta_J, \tau_p, L_\perp)$ that turns the current bridge family into a true physical prediction.
 
 ### C. Cosmological Metering Signature
 
@@ -566,7 +613,7 @@ The Einstein-backreaction branch is in better shape. In the exterior it is a GR-
 
 ### The Coupling Constant
 
-$\alpha$ is the central unknown. The hardware fit ($\alpha \approx 1.16$) applies to the lattice model, not to spacetime. The internal WEC benchmark ($\alpha < 0.133$) is a consistency cutoff, not a laboratory result. The repository now also contains a first executed measurement-anchored Casimir null bound, with strongest current benchmark value $\alpha \leq 6.79 \times 10^{-3}$ under the present anomaly model, plus a first explicit active-vs-inert differential design target at the `10^{-3}` level and a first exact planar screened-slab interaction law for the laboratory geometry. The dimensional estimate ($\alpha_{\text{SI}} \sim \ell_P^3$) still suggests the physical coupling may be extraordinarily small. All cosmological predictions depend on $\alpha$, and a direct first-principles physical extraction of $\alpha$ now reduces, on the laboratory side, to the missing source-normalization bridge between metering density and the effective slab source strength.
+$\alpha$ is the central unknown. The hardware fit ($\alpha \approx 1.16$) applies to the lattice model, not to spacetime. The internal WEC benchmark ($\alpha < 0.133$) is a consistency cutoff, not a laboratory result. The repository now also contains a first executed measurement-anchored Casimir null bound, with strongest current benchmark value $\alpha \leq 6.79 \times 10^{-3}$ under the present anomaly model, plus a first explicit active-vs-inert differential design target at the `10^{-3}` level, a first exact planar screened-slab interaction law for the laboratory geometry, and a first viable occupancy-style source bridge family. The dimensional estimate ($\alpha_{\text{SI}} \sim \ell_P^3$) still suggests the physical coupling may be extraordinarily small. All cosmological predictions depend on $\alpha$, and a direct first-principles physical extraction of $\alpha$ now reduces, on the laboratory side, to fixing the covariant law for $(\eta_J, \tau_p, L_\perp)$ rather than to inventing a bridge from scratch.
 
 ### Asymptotic Geometry
 
@@ -648,12 +695,12 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Potential shape discrimination | 6-site hardware comparison complete; $1/N^2$ gives the best fit among tested shapes |
 | Metering field equation (PDE + stability) | Numerical study complete; stable in the tested setups |
 | Photon decoupling | Model consequence of the mass-term-only coupling |
-| 3+1D lensing observable | Flat control, Einstein-backreaction branch, and explicit photon-sector branch are computable; the direct photon branch is heavily constrained; the Einstein branch is the current mainline candidate; spherical cluster-style maps remain convergence-dominated; multi-component, HFF-member, and calibrated member-plus-envelope Einstein maps generate sign-changing residual morphology without raw negative convergence; direct archive comparison now shows improved sign-structure and member-level agreement, and the rigid-alignment audit shows part of the remaining gap is registration-sensitive, but pixelwise field matching remains weak |
-| Decoherence rate source criterion | Proposed and computationally explored; not observationally established |
+| 3+1D lensing observable | Flat control, Einstein-backreaction branch, and explicit photon-sector branch are computable; the direct photon branch is heavily constrained; the Einstein branch is the current mainline candidate; spherical cluster-style maps remain convergence-dominated; multi-component, HFF-member, and calibrated displaced member-plus-envelope Einstein maps generate sign-changing residual morphology without raw negative convergence; the current 22-family calibration improves sign-structure and member-level agreement, and the rigid-alignment audit shows part of the remaining gap is registration-sensitive, but pixelwise field matching remains weak |
+| Decoherence rate source criterion | Dynamic activity density $R = \sum n_i \gamma_{D,i}$ adopted; exact slab work now identifies a first viable occupancy bridge family to the static source $J$; not yet fixed covariantly or observationally established |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
 | Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; the public-data proxy lane is exhausted without a replicated abundance-style signal; active focus shifts to the 3+1D lensing derivation |
 | Coq formalization | Initial abstract theorem development complete; monolithic file compiles |
-| Physical $\alpha$ laboratory program | Casimir benchmark null executed; strongest current benchmark cutoff $\alpha \leq 6.79 \times 10^{-3}$; active-vs-inert differential target and exact planar slab law defined; remaining blocker is the source-normalization bridge; direct first-principles measurement remains open |
+| Physical $\alpha$ laboratory program | Casimir benchmark null executed; strongest current benchmark cutoff $\alpha \leq 6.79 \times 10^{-3}$; active-vs-inert differential target, exact planar slab law, and first viable occupancy bridge family defined; remaining blocker is fixing $(\eta_J, \tau_p, L_\perp)$ covariantly; direct first-principles measurement remains open |
 
 ---
 

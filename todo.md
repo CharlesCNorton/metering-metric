@@ -1,16 +1,12 @@
 # Research TODO
 
-1. Isolate the core mechanism and make it the center of the project.
-2. Write the full 3+1D covariant theory: action, field content, source term `J`, coupling map, conservation laws, and consistency conditions.
-3. Unify photon decoupling, lensing, and redshift in one coherent formalism.
-4. Prove the continuum spectral statement you want to claim, and label the current mode counts exactly for what they are.
-5. State Theorem 3 in `meteringmetric.v` at its exact proven scope, then extend it only through explicit derivation.
-6. Introduce an epsilon-regularized lapse and rerun every headline result: confinement, tortoise behavior, PDE stability, void transition, and timing predictions.
-7. Define each `alpha` precisely and keep the lattice, continuum, and physical couplings fully separated.
-8. Derive the observables from the field equations themselves, especially massive wavepacket propagation and any genuine lensing signal.
-9. Rebuild `lensing.py` around confounder control: mass, radius, redshift, magnification, local convergence, and model family.
-10. Require every complexity or decoherence proxy to show conditional signal beyond mass.
-11. Upgrade the proxy inputs before expanding the cluster sample.
-12. Close the source-normalization bridge between metering density and the exact screened-slab laboratory interaction law.
-13. Rewrite `README.md` as a disciplined technical argument.
-14. Split the outputs into separate rigorous products: core theory, analogue evidence, and observational result.
+1. Fix the covariant occupancy bridge law for `(eta_J, tau_p, L_perp)` across laboratory, cosmology, and lensing.
+2. Write the full 3+1D covariant completion as explicit field equations with a closed conservation story.
+3. Push the Einstein-backreaction branch from residual-class agreement to a quantitatively competitive field-level match.
+4. Extend the calibrated cluster model with better smooth-halo structure, physical miscentering, and line-of-sight structure.
+5. Derive the massive-sector propagation observables in the same covariant language as the lensing branch.
+6. Prove the continuum spectral statement at the level the project intends to assert.
+7. Extend the Coq development beyond the current static and prescribed-path scope.
+8. Reopen the observational proxy lane only with genuinely better two-cluster data.
+9. Promote the split technical outputs into finished paper drafts.
+10. Revisit the deferred `N^-4` branch only after the mainline completion is exhausted.

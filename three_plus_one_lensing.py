@@ -34,6 +34,7 @@ from scipy.integrate import IntegrationWarning, cumulative_trapezoid, quad
 from scipy.ndimage import gaussian_filter, label, map_coordinates
 from lensing import build_residual_map as archival_build_residual_map
 from lensing import score_cutout as archival_score_cutout
+from metering_theory import tanh_lapse
 
 
 MetricFn = Callable[[float], float]
@@ -68,11 +69,6 @@ class SphericalMeteringProfile:
     mu_prime: np.ndarray
     screening_mass: float
     metadata: dict[str, float]
-
-
-def tanh_lapse(mu: float, alpha: float, epsilon: float = 0.0) -> float:
-    return float(epsilon + (1.0 - epsilon) * math.tanh(alpha * mu))
-
 
 def gaussian_mu(r: float, mu0: float, sigma: float) -> float:
     return float(mu0 * math.exp(-(r * r) / (2.0 * sigma * sigma)))

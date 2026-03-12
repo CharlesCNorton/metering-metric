@@ -26,11 +26,11 @@ from pathlib import Path
 from typing import Iterable
 
 import numpy as np
+from metering_theory import PLANCK_TIME
 
 
 HBAR = 1.054_571_817e-34
 C = 299_792_458.0
-G_NEWTON = 6.674_30e-11
 PI = math.pi
 NM = 1.0e-9
 MICRON = 1.0e-6
@@ -38,7 +38,6 @@ MPA = 1.0e-3
 UPA = 1.0e-6
 NN = 1.0e-9
 PN = 1.0e-12
-PLANCK_TIME = math.sqrt(HBAR * G_NEWTON / (C**5))
 
 
 @dataclass(frozen=True)
@@ -85,6 +84,8 @@ DEFAULT_DIFFERENTIAL_SEPARATIONS_UM = (0.2, 0.3, 0.5)
 DEFAULT_PLANAR_SEPARATIONS_UM = (0.2, 0.3, 0.5)
 DEFAULT_PLANAR_ALPHA_TARGETS = (1.0e-2, 1.0e-3, 1.0e-4)
 DEFAULT_REFERENCE_LAB_SOURCE_DENSITY = 1.0e40
+DEFAULT_SOURCE_BRIDGE_LENGTHS_UM = (0.05, 0.1, 0.2, 0.5, 1.0)
+DEFAULT_SOURCE_BRIDGE_TIMES_S = (PLANCK_TIME, 1.0e-21, 1.0e-18, 1.0e-15, 1.0e-12)
 
 
 def perfect_conductor_casimir_pressure(separation_m: float) -> float:
@@ -741,6 +742,147 @@ def build_planar_slab_geometry_report(
     }
 
 
+def build_source_bridge_report(
+    anomaly_factor_at_alpha_one: float,
+    scaling_power: float,
+    plate_area_m2: float,
+    plate_thickness_m: float,
+    screening_length_m: float,
+    source_strength: float,
+    force_floor_n: float,
+    samples: int,
+    domain_half_width_m: float,
+    reference_separation_m: float,
+    reference_lab_source_density: float,
+    alpha_targets: Iterable[float],
+    separations_m: Iterable[float],
+    candidate_lengths_m: Iterable[float],
+    candidate_times_s: Iterable[float],
+) -> dict:
+    planar_report = build_planar_slab_geometry_report(
+        separations_m=separations_m,
+        alpha_targets=alpha_targets,
+        anomaly_factor_at_alpha_one=anomaly_factor_at_alpha_one,
+        scaling_power=scaling_power,
+        plate_area_m2=plate_area_m2,
+        plate_thickness_m=plate_thickness_m,
+        screening_length_m=screening_length_m,
+        source_strength=source_strength,
+        force_floor_n=force_floor_n,
+        samples=samples,
+        domain_half_width_m=domain_half_width_m,
+        reference_separation_m=reference_separation_m,
+        reference_lab_source_density=reference_lab_source_density,
+    )
+    normalization_gap = planar_report["source_normalization_gap"]
+    required_conversion = float(normalization_gap["effective_conversion_factor"])
+    candidate_length_rows = []
+    for length_m in candidate_lengths_m:
+        required_tau = required_conversion * length_m * length_m
+        candidate_length_rows.append(
+            {
+                "transverse_scale_m": float(length_m),
+                "transverse_scale_um": float(length_m / MICRON),
+                "required_persistence_time_s_for_unit_efficiency": float(required_tau),
+                "required_persistence_time_in_planck_units_for_unit_efficiency": float(required_tau / PLANCK_TIME),
+            }
+        )
+
+    candidate_time_rows = []
+    for time_s in candidate_times_s:
+        required_efficiency = required_conversion * screening_length_m * screening_length_m / time_s
+        candidate_time_rows.append(
+            {
+                "persistence_time_s": float(time_s),
+                "persistence_time_in_planck_units": float(time_s / PLANCK_TIME),
+                "required_efficiency_at_screening_length": float(required_efficiency),
+            }
+        )
+
+    planck_tick_efficiency = required_conversion * screening_length_m * screening_length_m / PLANCK_TIME
+    planck_tick_length_for_unit_efficiency = math.sqrt(PLANCK_TIME / required_conversion)
+    screening_length_row = min(candidate_length_rows, key=lambda row: abs(row["transverse_scale_m"] - screening_length_m))
+    nearest_unit_efficiency_length_row = min(
+        candidate_length_rows,
+        key=lambda row: abs(math.log10(max(row["required_persistence_time_in_planck_units_for_unit_efficiency"], 1.0e-300))),
+    )
+    return {
+        "bridge_model": {
+            "dynamic_activity_formula": "R(x) = sum_i n_i(x) * gamma_D,i(x)",
+            "static_source_formula": "J(x) = kappa_J * R(x)",
+            "bridge_formula": "kappa_J = eta_J * tau_p / L_perp^2",
+            "dynamic_activity_units": "m^-3 s^-1",
+            "static_source_units": "m^-5",
+            "bridge_units": "s m^-2",
+            "statement": (
+                "The laboratory source bridge is formulated here as a reduction from the dynamic metering-activity "
+                "density R to the static screened source J. The factor kappa_J is interpreted as a persistence-time "
+                "factor divided by a transverse coarse-graining area."
+            ),
+        },
+        "planar_reference": {
+            "reference_separation_m": float(reference_separation_m),
+            "reference_separation_um": float(reference_separation_m / MICRON),
+            "screening_length_m": float(screening_length_m),
+            "screening_length_um": float(screening_length_m / MICRON),
+            "plate_thickness_m": float(plate_thickness_m),
+            "plate_thickness_um": float(plate_thickness_m / MICRON),
+            "required_bridge_conversion": float(required_conversion),
+            "reference_activity_density": float(reference_lab_source_density),
+            "reference_effective_source_strength": float(normalization_gap["effective_source_strength_required"]),
+        },
+        "candidate_length_rows": candidate_length_rows,
+        "candidate_time_rows": candidate_time_rows,
+        "planck_tick_screening_candidate": {
+            "persistence_time_s": float(PLANCK_TIME),
+            "transverse_scale_m": float(screening_length_m),
+            "transverse_scale_um": float(screening_length_m / MICRON),
+            "required_efficiency_eta_J": float(planck_tick_efficiency),
+        },
+        "unit_efficiency_planck_tick_candidate": {
+            "required_transverse_scale_m": float(planck_tick_length_for_unit_efficiency),
+            "required_transverse_scale_um": float(planck_tick_length_for_unit_efficiency / MICRON),
+            "persistence_time_s": float(PLANCK_TIME),
+            "persistence_time_in_planck_units": 1.0,
+        },
+        "recommended_bridge_family": {
+            "formula": "J(x) = eta_J * (t_P / L_perp(x)^2) * R(x)",
+            "screening_length_specialization": "J(x) = eta_J * (t_P / l_s(x)^2) * R(x)",
+            "required_eta_J_if_L_perp_equals_l_s": float(planck_tick_efficiency),
+            "statement": (
+                "At the current slab benchmark point, a Planck-tick occupancy bridge is the first non-naive bridge "
+                "family that lands in a dimensionless efficiency range below unity rather than at absurd suppression. "
+                "With L_perp = l_s = 0.2 um, the required eta_J is about 1.41e-2."
+            ),
+        },
+        "executive_summary": {
+            "recommended_reading": (
+                "The exact slab law no longer leaves the laboratory bridge unconstrained. It selects a required "
+                "conversion kappa_J and therefore a narrow family of viable bridge laws."
+            ),
+            "bridge_statement": (
+                f"Matching the current slab benchmark requires kappa_J = {required_conversion:.6g} s m^-2. "
+                f"If J = eta_J * (t_P / l_s^2) * R with l_s = {screening_length_m / MICRON:.6g} um, "
+                f"the required eta_J is {planck_tick_efficiency:.6g}."
+            ),
+            "scale_statement": (
+                f"With eta_J = 1 and tau_p = t_P, the corresponding transverse coarse-graining scale is "
+                f"{planck_tick_length_for_unit_efficiency / MICRON:.6g} um."
+            ),
+            "screening_length_statement": (
+                f"For unit efficiency at L_perp = {screening_length_row['transverse_scale_um']:.6g} um, the required "
+                f"persistence time is {screening_length_row['required_persistence_time_s_for_unit_efficiency']:.6g} s "
+                f"= {screening_length_row['required_persistence_time_in_planck_units_for_unit_efficiency']:.6g} t_P."
+            ),
+            "nearest_length_statement": (
+                f"Among the current candidate transverse scales, the one nearest unit Planck-scale efficiency is "
+                f"{nearest_unit_efficiency_length_row['transverse_scale_um']:.6g} um."
+            ),
+        },
+        "embedded_planar_report": planar_report,
+    }
+
+
 def build_casimir_benchmark_report(
     anomaly_factor_at_alpha_one: float,
     scaling_power: float,
@@ -871,6 +1013,27 @@ def command_casimir_planar_slab_report(args: argparse.Namespace) -> None:
     write_json_report(report, args.out)
 
 
+def command_casimir_source_bridge_report(args: argparse.Namespace) -> None:
+    report = build_source_bridge_report(
+        anomaly_factor_at_alpha_one=args.anomaly_factor_at_alpha_one,
+        scaling_power=args.scaling_power,
+        plate_area_m2=args.plate_area_mm2 * 1.0e-6,
+        plate_thickness_m=args.plate_thickness_um * MICRON,
+        screening_length_m=args.screening_length_um * MICRON,
+        source_strength=args.source_strength,
+        force_floor_n=args.force_floor_pn * PN,
+        samples=args.samples,
+        domain_half_width_m=args.domain_half_width_um * MICRON,
+        reference_separation_m=args.reference_separation_um * MICRON,
+        reference_lab_source_density=args.reference_lab_source_density,
+        alpha_targets=args.alpha_targets,
+        separations_m=[value * MICRON for value in args.separations_um],
+        candidate_lengths_m=[value * MICRON for value in args.bridge_lengths_um],
+        candidate_times_s=args.bridge_times_s,
+    )
+    write_json_report(report, args.out)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Laboratory-side benchmark bounds for the metering-metric coupling.",
@@ -943,6 +1106,48 @@ def build_parser() -> argparse.ArgumentParser:
     planar.add_argument("--reference-lab-source-density", type=float, default=DEFAULT_REFERENCE_LAB_SOURCE_DENSITY)
     planar.add_argument("--out", type=str, default=None)
     planar.set_defaults(func=command_casimir_planar_slab_report)
+
+    bridge = subparsers.add_parser(
+        "casimir-source-bridge-report",
+        help="Build a source-normalization bridge report on top of the exact slab law.",
+    )
+    bridge.add_argument("--anomaly-factor-at-alpha-one", type=float, default=16.0)
+    bridge.add_argument("--scaling-power", type=float, default=2.0)
+    bridge.add_argument("--reference-separation-um", type=float, default=0.2)
+    bridge.add_argument(
+        "--separations-um",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_PLANAR_SEPARATIONS_UM),
+    )
+    bridge.add_argument(
+        "--alpha-targets",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_PLANAR_ALPHA_TARGETS),
+    )
+    bridge.add_argument("--plate-area-mm2", type=float, default=1.0)
+    bridge.add_argument("--plate-thickness-um", type=float, default=0.05)
+    bridge.add_argument("--screening-length-um", type=float, default=0.2)
+    bridge.add_argument("--source-strength", type=float, default=1.0)
+    bridge.add_argument("--force-floor-pn", type=float, default=10.0)
+    bridge.add_argument("--samples", type=int, default=4001)
+    bridge.add_argument("--domain-half-width-um", type=float, default=2.0)
+    bridge.add_argument("--reference-lab-source-density", type=float, default=DEFAULT_REFERENCE_LAB_SOURCE_DENSITY)
+    bridge.add_argument(
+        "--bridge-lengths-um",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_SOURCE_BRIDGE_LENGTHS_UM),
+    )
+    bridge.add_argument(
+        "--bridge-times-s",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_SOURCE_BRIDGE_TIMES_S),
+    )
+    bridge.add_argument("--out", type=str, default=None)
+    bridge.set_defaults(func=command_casimir_source_bridge_report)
 
     return parser
 

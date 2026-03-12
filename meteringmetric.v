@@ -250,6 +250,22 @@ Proof.
     lra.
 Qed.
 
+Corollary proper_time_zero_interval_prescribed_path :
+  forall (f : R -> R) (mu : R -> R) (gamma : R -> R) (t1 t2 : R),
+  f 0 = 0 ->
+  t1 <= t2 ->
+  (forall t, t1 <= t <= t2 -> mu (gamma t) = 0) ->
+  RInt (fun t => lapse f mu (gamma t)) t1 t2 = 0.
+Proof.
+  apply proper_time_zero_interval.
+Qed.
+
+(**
+  Scope note: the proper-time theorem family here treats static observers and
+  prescribed paths supported entirely in meterless regions. It does not yet
+  formalize dynamically solved general worldlines.
+*)
+
 Lemma proper_time_bounded :
   forall (f : R -> R) (mu : R -> R) (x T : R),
   ActivationProps f -> MeteringProps mu ->
@@ -536,4 +552,8 @@ Qed.
    barrier integral can be made arbitrarily large. That is the precise
    sense in which the barrier to escape from the metered region becomes
    infinite in this model.
+
+   Scope note: this proves an unbounded continuum barrier under the stated
+   positivity and decay hypotheses. It does not, by itself, establish any
+   finite-dimensional continuum mode count.
 *)

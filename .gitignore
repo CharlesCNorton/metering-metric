@@ -51,6 +51,8 @@ tmp_inputs/
 theory_maps/*-baseline-check.json
 theory_maps/*-background-check.json
 theory_maps/*-checkpoint.json
+theory_maps/_timing_probe.json
+theory_maps/_timing_probe_fast.json
 theory_maps/einstein-bullet-offset-tight-residual-map.json
 theory_maps/einstein-bullet-offset-wide-residual-map.json
 theory_maps/hff-member-geometry-calibration-summary.json
