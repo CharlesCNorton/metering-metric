@@ -1,0 +1,781 @@
+{
+  "cluster_label": "Abell 370",
+  "parameters": {
+    "top_members": 40,
+    "mass_key": "mass_neb",
+    "member_flag_key": "is_cluster_member",
+    "ra_key": "ra",
+    "dec_key": "dec",
+    "amplitude_scaling_exponent": 1.0,
+    "size_scaling_exponent": 0.5,
+    "minimum_size_scale": 0.2,
+    "source_kind": "softened_nfw",
+    "source_amplitude": 0.001,
+    "source_sigma": 120.0,
+    "source_core_radius": 80.0,
+    "source_scale_radius": 250.0,
+    "source_beta": 0.8,
+    "source_outer_slope": 3.0,
+    "screening_mass": 0.01,
+    "density_scale": 1e-06,
+    "gravity_scale": 1.0,
+    "exterior_match_tolerance": 1e-06,
+    "profile_r_max": 8000.0,
+    "profile_samples": 4096,
+    "impact_min": 30.0,
+    "impact_max": 4000.0,
+    "radial_samples": 64,
+    "r_max": 80000.0,
+    "radial_bin_width": 120.0,
+    "smooth_sigma_px": 3.0,
+    "axis_samples": 257,
+    "archive_residual_mode": "radial_median_bandpass",
+    "archive_smooth_sigma_px": 18.0,
+    "archive_radial_bin_arcsec": 8.0,
+    "inner_radius_arcsec": 2.5,
+    "ring_inner_arcsec": 5.0,
+    "ring_outer_arcsec": 9.0,
+    "auto_extent_padding_arcsec": 80.0,
+    "minimum_extent_arcsec": 120.0,
+    "smooth_background_amplitude_fraction": 0.35,
+    "smooth_background_size_multiplier": 5.0,
+    "smooth_background_minimum_size_scale": 1.0,
+    "smooth_background_position_shrink": 0.75,
+    "grid_size": 513
+  },
+  "alignment_search_parameters": {
+    "max_shift_arcsec": 20.0,
+    "shift_steps": 5,
+    "max_rotation_deg": 20.0,
+    "rotation_steps": 5
+  },
+  "baseline_comparison": {
+    "finite_pixel_count": 263169,
+    "resolved_pixel_count": 51332,
+    "pearson_correlation": 0.010663731787078575,
+    "spearman_correlation": 0.06159404248442909,
+    "linear_fit_archive_from_theory": {
+      "intercept": -6.785834245136012e-05,
+      "slope": 5607774.008175659,
+      "rmse": 0.08886030883582623
+    },
+    "cosine_similarity": 0.010663728678080223,
+    "resolved_sign_agreement_fraction": 0.5740473778539702,
+    "positive_jaccard_resolved": 0.03562275246855939,
+    "negative_jaccard_resolved": 0.2752503117322436,
+    "harmonic_l2_distance": 0.061895596843757825,
+    "theory_harmonics": {
+      "m1": 0.013048920405576777,
+      "m2": 0.00045094058883273516,
+      "m3": 0.0015171752847730883,
+      "m4": 0.00038160061937290974
+    },
+    "archival_harmonics": {
+      "m1": 0.0298698926345388,
+      "m2": 0.04449319062512741,
+      "m3": 0.02764999154139997,
+      "m4": 0.030803236475377957
+    },
+    "member_score_comparison": {
+      "n_paired_members": 40,
+      "pearson_correlation": 0.19476235365098807,
+      "spearman_correlation": 0.40826928580781696,
+      "linear_fit_archive_from_theory": {
+        "intercept": 0.08809856219529728,
+        "slope": 143752700.9445656,
+        "rmse": 0.13004196120727932
+      },
+      "sign_flip_pass_agreement_fraction": 0.25,
+      "paired_rows": [
+        {
+          "name": "member_100019",
+          "member_mass": 409.4,
+          "theory_sign_flip_score": 1.0720922508151186e-10,
+          "archival_sign_flip_score": 0.6419098995594845,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_1672",
+          "member_mass": 347.3,
+          "theory_sign_flip_score": 3.71527316176797e-10,
+          "archival_sign_flip_score": 0.5543042284534391,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_1402",
+          "member_mass": 132.6,
+          "theory_sign_flip_score": 1.5567476831225122e-10,
+          "archival_sign_flip_score": 0.3128702861267611,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_100023",
+          "member_mass": 123.1,
+          "theory_sign_flip_score": 4.900105637871611e-10,
+          "archival_sign_flip_score": 0.180752275578733,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_1780",
+          "member_mass": 118.9,
+          "theory_sign_flip_score": 4.4687353778835125e-10,
+          "archival_sign_flip_score": 0.22429732486597131,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2826",
+          "member_mass": 98.22,
+          "theory_sign_flip_score": 2.8818166129951106e-10,
+          "archival_sign_flip_score": 0.20039689646545902,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_3146",
+          "member_mass": 92.22,
+          "theory_sign_flip_score": 4.604472618070428e-11,
+          "archival_sign_flip_score": 0.10749034830789506,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_1386",
+          "member_mass": 88.44,
+          "theory_sign_flip_score": 4.8779941598542e-10,
+          "archival_sign_flip_score": 0.17277668130488757,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_873",
+          "member_mass": 72.3,
+          "theory_sign_flip_score": 2.874221917558592e-10,
+          "archival_sign_flip_score": 0.1303305780030758,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_1470",
+          "member_mass": 68.19,
+          "theory_sign_flip_score": 3.9234442979538364e-10,
+          "archival_sign_flip_score": 0.002140201473314592,
+          "theory_sign_flip_pass": 1,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_1531",
+          "member_mass": 67.07,
+          "theory_sign_flip_score": 1.9710620403337104e-10,
+          "archival_sign_flip_score": 0.01680787116633206,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_2258",
+          "member_mass": 64.17,
+          "theory_sign_flip_score": 2.5872984995763734e-10,
+          "archival_sign_flip_score": 0.2984010621481875,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2351",
+          "member_mass": 63.43,
+          "theory_sign_flip_score": 4.0643238102573903e-10,
+          "archival_sign_flip_score": 0.10394875877716436,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2210",
+          "member_mass": 55.64,
+          "theory_sign_flip_score": 4.24424134914315e-10,
+          "archival_sign_flip_score": 0.1087080700877125,
+          "theory_sign_flip_pass": 1,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_2504",
+          "member_mass": 46.61,
+          "theory_sign_flip_score": 5.17393957694085e-10,
+          "archival_sign_flip_score": 0.10551637146666105,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2373",
+          "member_mass": 39.74,
+          "theory_sign_flip_score": 3.538344296909579e-10,
+          "archival_sign_flip_score": 0.13800936963593285,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_3323",
+          "member_mass": 35.65,
+          "theory_sign_flip_score": 0.0,
+          "archival_sign_flip_score": 0.06377992649881195,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_1869",
+          "member_mass": 33.77,
+          "theory_sign_flip_score": 8.30515760528925e-12,
+          "archival_sign_flip_score": 0.0002378209985139397,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_1952",
+          "member_mass": 33.54,
+          "theory_sign_flip_score": 3.0109980346436896e-10,
+          "archival_sign_flip_score": 0.07006878704554016,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2044",
+          "member_mass": 29.78,
+          "theory_sign_flip_score": 2.4443357634876096e-10,
+          "archival_sign_flip_score": 0.07713180050030675,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_3979",
+          "member_mass": 29.49,
+          "theory_sign_flip_score": 0.0,
+          "archival_sign_flip_score": 0.093798589971284,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_800",
+          "member_mass": 29.06,
+          "theory_sign_flip_score": 1.0128716563066233e-10,
+          "archival_sign_flip_score": 0.08442364100533774,
+          "theory_sign_flip_pass": 1,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2609",
+          "member_mass": 28.64,
+          "theory_sign_flip_score": 3.8120381259798214e-10,
+          "archival_sign_flip_score": 0.06661511261025149,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2672",
+          "member_mass": 27.34,
+          "theory_sign_flip_score": 4.568925895262925e-10,
+          "archival_sign_flip_score": 0.21220482441141342,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2814",
+          "member_mass": 25.6,
+          "theory_sign_flip_score": 4.844345870714082e-10,
+          "archival_sign_flip_score": 0.14081492390201744,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_3365",
+          "member_mass": 25.38,
+          "theory_sign_flip_score": 2.1721861957068774e-10,
+          "archival_sign_flip_score": 0.027439712890131324,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_3314",
+          "member_mass": 24.63,
+          "theory_sign_flip_score": 2.1998361271262465e-11,
+          "archival_sign_flip_score": 0.06773209885199505,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2341",
+          "member_mass": 23.87,
+          "theory_sign_flip_score": 4.687285164641519e-10,
+          "archival_sign_flip_score": 0.022320801428626916,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_3280",
+          "member_mass": 23.21,
+          "theory_sign_flip_score": 2.2899083573252912e-11,
+          "archival_sign_flip_score": 0.10118173153709593,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2525",
+          "member_mass": 22.86,
+          "theory_sign_flip_score": 2.872346743928723e-10,
+          "archival_sign_flip_score": 0.04241271497373192,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_3366",
+          "member_mass": 22.33,
+          "theory_sign_flip_score": 0.0,
+          "archival_sign_flip_score": 0.0,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_3396",
+          "member_mass": 22.08,
+          "theory_sign_flip_score": 0.0,
+          "archival_sign_flip_score": 0.06420430711108067,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_1821",
+          "member_mass": 21.63,
+          "theory_sign_flip_score": 4.697930298737454e-10,
+          "archival_sign_flip_score": 0.05782729734314697,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_621",
+          "member_mass": 21.4,
+          "theory_sign_flip_score": 0.0,
+          "archival_sign_flip_score": 0.039779101147662865,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_3183",
+          "member_mass": 21.02,
+          "theory_sign_flip_score": 2.488433785700283e-11,
+          "archival_sign_flip_score": 0.03439177508765633,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_1980",
+          "member_mass": 19.43,
+          "theory_sign_flip_score": 8.433359694289726e-11,
+          "archival_sign_flip_score": 0.04800535301931657,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2699",
+          "member_mass": 18.8,
+          "theory_sign_flip_score": 0.0,
+          "archival_sign_flip_score": 0.05058305772545915,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_2960",
+          "member_mass": 17.68,
+          "theory_sign_flip_score": 7.710317939758729e-11,
+          "archival_sign_flip_score": 0.08358132392876291,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 1
+        },
+        {
+          "name": "member_1523",
+          "member_mass": 16.62,
+          "theory_sign_flip_score": 1.086024924726383e-10,
+          "archival_sign_flip_score": 0.0024377933042290956,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        },
+        {
+          "name": "member_1635",
+          "member_mass": 14.48,
+          "theory_sign_flip_score": 2.128070267612247e-10,
+          "archival_sign_flip_score": 0.09744821243552254,
+          "theory_sign_flip_pass": 0,
+          "archival_sign_flip_pass": 0
+        }
+      ]
+    }
+  },
+  "alignment_search": {
+    "search_performed": true,
+    "best_shift_x_arcsec": -10.0,
+    "best_shift_y_arcsec": 0.0,
+    "best_rotation_deg": -10.0,
+    "best_objective": 1.0102212572778277,
+    "best_comparison": {
+      "finite_pixel_count": 242082,
+      "resolved_pixel_count": 51296,
+      "pearson_correlation": 0.01043931721647369,
+      "spearman_correlation": 0.10724515218121389,
+      "linear_fit_archive_from_theory": {
+        "intercept": -0.00010052607703380759,
+        "slope": 5872375.106985376,
+        "rmse": 0.09264989808994911
+      },
+      "cosine_similarity": 0.010411806320796673,
+      "resolved_sign_agreement_fraction": 0.5714285714285714,
+      "positive_jaccard_resolved": 0.03797501533364438,
+      "negative_jaccard_resolved": 0.3096003030345544,
+      "harmonic_l2_distance": 0.03755808288924893,
+      "theory_harmonics": {
+        "m1": 0.03126995090258412,
+        "m2": 0.009461568813381165,
+        "m3": 0.014224040525799486,
+        "m4": 0.02971753866877973
+      },
+      "archival_harmonics": {
+        "m1": 0.0298698926345388,
+        "m2": 0.04449319062512741,
+        "m3": 0.02764999154139997,
+        "m4": 0.030803236475377957
+      },
+      "member_score_comparison": {
+        "n_paired_members": 40,
+        "pearson_correlation": 0.1689575776369244,
+        "spearman_correlation": 0.45201897860613116,
+        "linear_fit_archive_from_theory": {
+          "intercept": 0.09471978595017444,
+          "slope": 125677018.713879,
+          "rmse": 0.13067475140543863
+        },
+        "sign_flip_pass_agreement_fraction": 0.4,
+        "paired_rows": [
+          {
+            "name": "member_100019",
+            "member_mass": 409.4,
+            "theory_sign_flip_score": 1.6443046208830157e-10,
+            "archival_sign_flip_score": 0.6419098995594845,
+            "theory_sign_flip_pass": 1,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_1672",
+            "member_mass": 347.3,
+            "theory_sign_flip_score": 9.234409578974814e-11,
+            "archival_sign_flip_score": 0.5543042284534391,
+            "theory_sign_flip_pass": 1,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_1402",
+            "member_mass": 132.6,
+            "theory_sign_flip_score": 2.2848477712344593e-10,
+            "archival_sign_flip_score": 0.3128702861267611,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_100023",
+            "member_mass": 123.1,
+            "theory_sign_flip_score": 4.965407730755916e-10,
+            "archival_sign_flip_score": 0.180752275578733,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_1780",
+            "member_mass": 118.9,
+            "theory_sign_flip_score": 4.841364544983358e-10,
+            "archival_sign_flip_score": 0.22429732486597131,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2826",
+            "member_mass": 98.22,
+            "theory_sign_flip_score": 3.2357582307702376e-10,
+            "archival_sign_flip_score": 0.20039689646545902,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_3146",
+            "member_mass": 92.22,
+            "theory_sign_flip_score": 4.654329544383135e-12,
+            "archival_sign_flip_score": 0.10749034830789506,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_1386",
+            "member_mass": 88.44,
+            "theory_sign_flip_score": 4.314810796882927e-10,
+            "archival_sign_flip_score": 0.17277668130488757,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_873",
+            "member_mass": 72.3,
+            "theory_sign_flip_score": 3.7724520787203003e-10,
+            "archival_sign_flip_score": 0.1303305780030758,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_1470",
+            "member_mass": 68.19,
+            "theory_sign_flip_score": 2.2232384089872544e-10,
+            "archival_sign_flip_score": 0.002140201473314592,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_1531",
+            "member_mass": 67.07,
+            "theory_sign_flip_score": 3.121392183344526e-10,
+            "archival_sign_flip_score": 0.01680787116633206,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_2258",
+            "member_mass": 64.17,
+            "theory_sign_flip_score": 3.33061155052112e-10,
+            "archival_sign_flip_score": 0.2984010621481875,
+            "theory_sign_flip_pass": 1,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2351",
+            "member_mass": 63.43,
+            "theory_sign_flip_score": 6.154944539452912e-11,
+            "archival_sign_flip_score": 0.10394875877716436,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2210",
+            "member_mass": 55.64,
+            "theory_sign_flip_score": 6.037129436977058e-10,
+            "archival_sign_flip_score": 0.1087080700877125,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_2504",
+            "member_mass": 46.61,
+            "theory_sign_flip_score": 3.6714176473085444e-10,
+            "archival_sign_flip_score": 0.10551637146666105,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2373",
+            "member_mass": 39.74,
+            "theory_sign_flip_score": 3.3416474891925723e-10,
+            "archival_sign_flip_score": 0.13800936963593285,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_3323",
+            "member_mass": 35.65,
+            "theory_sign_flip_score": 4.7983257709458896e-11,
+            "archival_sign_flip_score": 0.06377992649881195,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_1869",
+            "member_mass": 33.77,
+            "theory_sign_flip_score": 1.9592017055418013e-11,
+            "archival_sign_flip_score": 0.0002378209985139397,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_1952",
+            "member_mass": 33.54,
+            "theory_sign_flip_score": 6.068506769742816e-11,
+            "archival_sign_flip_score": 0.07006878704554016,
+            "theory_sign_flip_pass": 1,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2044",
+            "member_mass": 29.78,
+            "theory_sign_flip_score": 0.0,
+            "archival_sign_flip_score": 0.07713180050030675,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_3979",
+            "member_mass": 29.49,
+            "theory_sign_flip_score": 4.669727166515763e-11,
+            "archival_sign_flip_score": 0.093798589971284,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_800",
+            "member_mass": 29.06,
+            "theory_sign_flip_score": 2.7151681041175636e-10,
+            "archival_sign_flip_score": 0.08442364100533774,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2609",
+            "member_mass": 28.64,
+            "theory_sign_flip_score": 4.0228329004680385e-10,
+            "archival_sign_flip_score": 0.06661511261025149,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2672",
+            "member_mass": 27.34,
+            "theory_sign_flip_score": 4.381768883332795e-10,
+            "archival_sign_flip_score": 0.21220482441141342,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2814",
+            "member_mass": 25.6,
+            "theory_sign_flip_score": 4.844556328445056e-10,
+            "archival_sign_flip_score": 0.14081492390201744,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_3365",
+            "member_mass": 25.38,
+            "theory_sign_flip_score": 0.0,
+            "archival_sign_flip_score": 0.027439712890131324,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_3314",
+            "member_mass": 24.63,
+            "theory_sign_flip_score": 0.0,
+            "archival_sign_flip_score": 0.06773209885199505,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2341",
+            "member_mass": 23.87,
+            "theory_sign_flip_score": 4.397664822310818e-10,
+            "archival_sign_flip_score": 0.022320801428626916,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_3280",
+            "member_mass": 23.21,
+            "theory_sign_flip_score": 3.660756015434483e-11,
+            "archival_sign_flip_score": 0.10118173153709593,
+            "theory_sign_flip_pass": 1,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2525",
+            "member_mass": 22.86,
+            "theory_sign_flip_score": 6.050614622987376e-11,
+            "archival_sign_flip_score": 0.04241271497373192,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_3366",
+            "member_mass": 22.33,
+            "theory_sign_flip_score": 0.0,
+            "archival_sign_flip_score": 0.0,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_3396",
+            "member_mass": 22.08,
+            "theory_sign_flip_score": 3.467738753823345e-11,
+            "archival_sign_flip_score": 0.06420430711108067,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_1821",
+            "member_mass": 21.63,
+            "theory_sign_flip_score": 4.322932646461038e-11,
+            "archival_sign_flip_score": 0.05782729734314697,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_621",
+            "member_mass": 21.4,
+            "theory_sign_flip_score": 0.0,
+            "archival_sign_flip_score": 0.039779101147662865,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_3183",
+            "member_mass": 21.02,
+            "theory_sign_flip_score": 1.4016201084296613e-10,
+            "archival_sign_flip_score": 0.03439177508765633,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_1980",
+            "member_mass": 19.43,
+            "theory_sign_flip_score": 2.7888568387890807e-10,
+            "archival_sign_flip_score": 0.04800535301931657,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2699",
+            "member_mass": 18.8,
+            "theory_sign_flip_score": 1.1239081486375028e-10,
+            "archival_sign_flip_score": 0.05058305772545915,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_2960",
+            "member_mass": 17.68,
+            "theory_sign_flip_score": 6.116725750288424e-11,
+            "archival_sign_flip_score": 0.08358132392876291,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 1
+          },
+          {
+            "name": "member_1523",
+            "member_mass": 16.62,
+            "theory_sign_flip_score": 3.0419842778490486e-10,
+            "archival_sign_flip_score": 0.0024377933042290956,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          },
+          {
+            "name": "member_1635",
+            "member_mass": 14.48,
+            "theory_sign_flip_score": 3.0074067619444844e-10,
+            "archival_sign_flip_score": 0.09744821243552254,
+            "theory_sign_flip_pass": 0,
+            "archival_sign_flip_pass": 0
+          }
+        ]
+      }
+    }
+  }
+}

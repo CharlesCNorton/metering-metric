@@ -69,19 +69,19 @@
       },
       "ppn_gamma_audit": {
         "reference_radius": 960.0,
-        "lapse_A": 0.9999961472389537,
-        "radial_B": 1.0000038527717625,
-        "effective_newtonian_potential_U": 1.92638052315397e-06,
+        "lapse_A": 0.9999961472436644,
+        "radial_B": 1.0000038527711794,
+        "effective_newtonian_potential_U": 1.926378167815823e-06,
         "mapped_to_ppn_gamma": true,
-        "gamma_eff": 1.000002781435332,
-        "abs_delta_gamma_from_gr": 2.7814353320554375e-06,
+        "gamma_eff": 1.000003852772293,
+        "abs_delta_gamma_from_gr": 3.8527722929782016e-06,
         "vlba_gamma_central": 0.9998,
         "vlba_gamma_sigma": 0.0003,
-        "vlba_sigma_offset": 0.6759381177734448,
+        "vlba_sigma_offset": 0.6795092409765207,
         "passes_vlba_2sigma": true,
         "cassini_gamma_central": 1.000021,
         "cassini_gamma_sigma": 2.3e-05,
-        "cassini_sigma_offset": 0.7921115073040574,
+        "cassini_sigma_offset": 0.7455316394378503,
         "passes_cassini_2sigma": true,
         "gw170817_wep_mw_limit": 5.9e-08,
         "passes_gw170817_wep_mw": false,
@@ -89,37 +89,41 @@
         "passes_gw170817_wep_virgo": false
       },
       "deflection": {
-        "turning_radius": 959.998150669747,
-        "deflection_angle_rad": 7.706316889066755e-06,
-        "deflection_angle_arcsec": 1.5895419600020806,
-        "integration_error_estimate": 8.160510466858606e-11
+        "turning_radius": 959.9981506719151,
+        "deflection_angle_rad": 7.705215657072273e-06,
+        "deflection_angle_arcsec": 1.5893148145981058,
+        "integration_error_estimate": 7.088632028587951e-11
       },
       "coordinate_time": {
-        "turning_radius": 959.998150669747,
-        "roundtrip_coordinate_time": 99981.58733380312,
+        "turning_radius": 959.9981506719151,
+        "roundtrip_coordinate_time": 99981.6043664449,
         "flat_roundtrip_coordinate_time": 99981.56630011738,
-        "excess_roundtrip_time": 0.02103368574171327,
-        "integration_error_estimate": 1.534040149676636e-06
+        "excess_roundtrip_time": 0.038066327513661236,
+        "integration_error_estimate": 1.777463239524546e-06
       },
       "redshift": {
-        "frequency_ratio_nu_obs_over_nu_emit": 0.9999980736176214,
-        "redshift_z": 1.9263860895346596e-06
+        "frequency_ratio_nu_obs_over_nu_emit": 0.9999981106063683,
+        "redshift_z": 1.8893972015820992e-06
       },
       "metric_metadata": {
-        "source_amplitude": 0.001,
-        "source_sigma": 120.0,
         "profile_r_max": 5000.0,
         "profile_samples": 2048.0,
         "max_mu": 0.3705010603014383,
         "max_source": 0.001,
         "max_field_equation_residual": 3.2834357010283997e-06,
+        "source_kind": "gaussian",
+        "source_amplitude": 0.001,
+        "source_sigma": 120.0,
         "density_scale": 1e-06,
         "gravity_scale": 1.0,
         "max_energy_density": 1.715898029387765e-10,
         "max_radial_pressure": 2.5663843026068465e-35,
         "max_compactness_2GM_over_r": 1.558446526829561e-05,
-        "minimum_photon_lapse": 0.9999919106958233,
-        "gravity_scaled_mass": 0.0018493230411909811
+        "minimum_photon_lapse": 0.9999919107030716,
+        "gravity_scaled_mass": 0.0018493230411909811,
+        "exterior_match_radius": 632.6331216414266,
+        "exterior_match_mass": 0.001849323041094199,
+        "exterior_match_tolerance": 1e-06
       },
       "interpretation_note": "This branch is GR-derived. Outside the effective source tail it should approach a Schwarzschild exterior with gamma = 1. Local gamma offsets on the Gaussian shoulder are a profile/numerical extraction issue, not a distinct non-GR coupling."
     },
@@ -171,13 +175,14 @@
         "redshift_z": 0.0
       },
       "metric_metadata": {
-        "source_amplitude": 0.001,
-        "source_sigma": 120.0,
         "profile_r_max": 5000.0,
         "profile_samples": 2048.0,
         "max_mu": 0.3705010603014383,
         "max_source": 0.001,
         "max_field_equation_residual": 3.2834357010283997e-06,
+        "source_kind": "gaussian",
+        "source_amplitude": 0.001,
+        "source_sigma": 120.0,
         "temporal_coupling": 0.02,
         "radial_coupling": 0.1,
         "photon_alpha": 1.0,

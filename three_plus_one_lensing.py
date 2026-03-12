@@ -27,8 +27,13 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
+from astropy.io import fits
+from astropy.wcs import WCS
+from scipy.stats import spearmanr
 from scipy.integrate import IntegrationWarning, cumulative_trapezoid, quad
 from scipy.ndimage import gaussian_filter, label, map_coordinates
+from lensing import build_residual_map as archival_build_residual_map
+from lensing import score_cutout as archival_score_cutout
 
 
 MetricFn = Callable[[float], float]
@@ -1069,6 +1074,7 @@ def load_member_geometry_component_specs(
     member_flag_key: str,
     ra_key: str,
     dec_key: str,
+    amplitude_scaling_exponent: float,
     size_scaling_exponent: float,
     minimum_size_scale: float,
 ) -> tuple[list[dict], dict[str, float]]:
@@ -1111,18 +1117,20 @@ def load_member_geometry_component_specs(
     component_specs = []
     for item in selected:
         weight = item["mass"] / max_mass
+        amplitude_scale = weight**amplitude_scaling_exponent
         size_scale = max(weight**size_scaling_exponent, minimum_size_scale)
         component_specs.append(
             {
                 "name": item["name"],
                 "center_x": (item["ra"] - centroid_ra) * cos_dec * 3600.0,
                 "center_y": (item["dec"] - centroid_dec) * 3600.0,
-                "amplitude_scale": weight,
+                "amplitude_scale": amplitude_scale,
                 "sigma_scale": size_scale,
                 "core_scale": size_scale,
                 "scale_radius_scale": size_scale,
                 "weight": weight,
                 "member_mass": item["mass"],
+                "layer": "member",
             }
         )
 
@@ -1132,10 +1140,114 @@ def load_member_geometry_component_specs(
         "max_member_mass": float(max_mass),
         "centroid_ra_deg": float(centroid_ra),
         "centroid_dec_deg": float(centroid_dec),
+        "amplitude_scaling_exponent": float(amplitude_scaling_exponent),
         "size_scaling_exponent": float(size_scaling_exponent),
         "minimum_size_scale": float(minimum_size_scale),
     }
     return component_specs, metadata
+
+
+def build_smoothed_background_component_specs(
+    component_specs: list[dict],
+    amplitude_fraction: float,
+    size_multiplier: float,
+    minimum_size_scale: float,
+    position_shrink: float,
+) -> list[dict]:
+    if amplitude_fraction <= 0.0:
+        return []
+
+    clamped_position_shrink = min(max(position_shrink, 0.0), 1.0)
+    background_specs = []
+    for spec in component_specs:
+        amplitude_scale = float(spec.get("amplitude_scale", 1.0)) * amplitude_fraction
+        if amplitude_scale <= 0.0:
+            continue
+        size_scale = max(float(spec.get("sigma_scale", 1.0)) * size_multiplier, minimum_size_scale)
+        background_specs.append(
+            {
+                **spec,
+                "name": f"background_{spec['name']}",
+                "center_x": (1.0 - clamped_position_shrink) * float(spec["center_x"]),
+                "center_y": (1.0 - clamped_position_shrink) * float(spec["center_y"]),
+                "amplitude_scale": amplitude_scale,
+                "sigma_scale": size_scale,
+                "core_scale": max(float(spec.get("core_scale", 1.0)) * size_multiplier, minimum_size_scale),
+                "scale_radius_scale": max(
+                    float(spec.get("scale_radius_scale", 1.0)) * size_multiplier,
+                    minimum_size_scale,
+                ),
+                "weight": float(spec.get("weight", 1.0)) * amplitude_fraction,
+                "layer": "smooth_background",
+            }
+        )
+    return background_specs
+
+
+def build_einstein_component_payloads(
+    component_specs: list[dict],
+    source_kind: str,
+    source_amplitude: float,
+    source_sigma: float,
+    source_core_radius: float,
+    source_scale_radius: float,
+    source_beta: float,
+    source_outer_slope: float,
+    screening_mass: float,
+    density_scale: float,
+    gravity_scale: float,
+    exterior_match_tolerance: float,
+    profile_r_max: float,
+    profile_samples: int,
+    impact_min: float,
+    impact_max: float,
+    radial_samples: int,
+    r_max: float,
+) -> list[dict]:
+    component_payloads = []
+    for spec in component_specs:
+        profile = solve_screened_poisson_cluster_profile(
+            source_kind=source_kind,
+            source_amplitude=source_amplitude * float(spec.get("amplitude_scale", 1.0)),
+            source_sigma=source_sigma * float(spec.get("sigma_scale", 1.0)),
+            source_core_radius=source_core_radius * float(spec.get("core_scale", 1.0)),
+            source_scale_radius=source_scale_radius * float(spec.get("scale_radius_scale", 1.0)),
+            source_beta=source_beta,
+            source_outer_slope=source_outer_slope,
+            screening_mass=screening_mass,
+            profile_r_max=profile_r_max,
+            profile_samples=profile_samples,
+        )
+        metric = einstein_scalar_backreaction_metric_from_profile(
+            profile=profile,
+            density_scale=density_scale,
+            gravity_scale=gravity_scale,
+            exterior_match_tolerance=exterior_match_tolerance,
+        )
+        radial_profile = sample_axisymmetric_lensing_profile(
+            metric,
+            impact_min=impact_min,
+            impact_max=impact_max,
+            samples=radial_samples,
+            r_max=r_max,
+        )
+        component_payloads.append(
+            {
+                "spec": spec,
+                "source_profile": profile.metadata,
+                "metric_metadata": metric.metadata,
+                "radial_profile": radial_profile,
+            }
+        )
+    return component_payloads
+
+
+def suggested_map_extent(component_specs: list[dict], padding_arcsec: float, minimum_extent: float) -> float:
+    max_radius = max(
+        math.hypot(float(spec["center_x"]), float(spec["center_y"]))
+        for spec in component_specs
+    )
+    return float(max(minimum_extent, max_radius + padding_arcsec))
 
 
 def build_multicomponent_lensing_map(
@@ -1245,6 +1357,424 @@ def build_multicomponent_lensing_map(
             }
         )
     return result
+
+
+def sample_map_with_weighted_bilinear(
+    image: np.ndarray,
+    valid_mask: np.ndarray,
+    x_coords: np.ndarray,
+    y_coords: np.ndarray,
+) -> np.ndarray:
+    values = np.where(valid_mask, image, 0.0)
+    weights = np.where(valid_mask, 1.0, 0.0)
+    sampled_values = map_coordinates(values, [y_coords, x_coords], order=1, mode="constant", cval=0.0)
+    sampled_weights = map_coordinates(weights, [y_coords, x_coords], order=1, mode="constant", cval=0.0)
+    result = np.full(sampled_values.shape, np.nan, dtype=float)
+    valid = sampled_weights > 1.0e-6
+    result[valid] = sampled_values[valid] / sampled_weights[valid]
+    return result
+
+
+def rigid_transform_map(
+    image: np.ndarray,
+    extent: float,
+    shift_x_arcsec: float,
+    shift_y_arcsec: float,
+    rotation_deg: float,
+) -> np.ndarray:
+    grid_size_y, grid_size_x = image.shape
+    xs = np.linspace(-extent, extent, grid_size_x)
+    ys = np.linspace(-extent, extent, grid_size_y)
+    x_grid, y_grid = np.meshgrid(xs, ys)
+    angle = math.radians(rotation_deg)
+    cos_angle = math.cos(angle)
+    sin_angle = math.sin(angle)
+    x_shifted = x_grid - shift_x_arcsec
+    y_shifted = y_grid - shift_y_arcsec
+    source_x = cos_angle * x_shifted + sin_angle * y_shifted
+    source_y = -sin_angle * x_shifted + cos_angle * y_shifted
+    pixel_scale_x = (2.0 * extent) / max(grid_size_x - 1, 1)
+    pixel_scale_y = (2.0 * extent) / max(grid_size_y - 1, 1)
+    source_xpix = (source_x + extent) / pixel_scale_x
+    source_ypix = (source_y + extent) / pixel_scale_y
+    return sample_map_with_weighted_bilinear(
+        image=image,
+        valid_mask=np.isfinite(image),
+        x_coords=source_xpix,
+        y_coords=source_ypix,
+    )
+
+
+def build_archival_residual_map_on_member_grid(
+    kappa_path: Path,
+    centroid_ra_deg: float,
+    centroid_dec_deg: float,
+    extent: float,
+    grid_size: int,
+    residual_mode: str,
+    smooth_sigma_px: float,
+    radial_bin_arcsec: float,
+) -> tuple[np.ndarray, dict[str, float], float]:
+    with fits.open(kappa_path) as hdul:
+        kappa = np.asarray(hdul[0].data, dtype=float)
+        header = hdul[0].header
+        wcs = WCS(header)
+
+    pixel_scale_deg = header.get("CD1_1", header.get("CDELT1"))
+    if pixel_scale_deg is None:
+        raise ValueError("Could not determine pixel scale from FITS header.")
+    pixel_scale_arcsec = abs(float(pixel_scale_deg)) * 3600.0
+    footprint = np.isfinite(kappa)
+    cluster_center_ra = float(header["CRVAL1"])
+    cluster_center_dec = float(header["CRVAL2"])
+    center_xpix, center_ypix = wcs.world_to_pixel_values(cluster_center_ra, cluster_center_dec)
+    residual, residual_model = archival_build_residual_map(
+        kappa=kappa,
+        footprint=footprint,
+        center_xpix=float(center_xpix),
+        center_ypix=float(center_ypix),
+        pixel_scale_arcsec=pixel_scale_arcsec,
+        residual_mode=residual_mode,
+        smooth_sigma_px=smooth_sigma_px,
+        radial_bin_arcsec=radial_bin_arcsec,
+    )
+
+    xs = np.linspace(-extent, extent, grid_size)
+    ys = np.linspace(-extent, extent, grid_size)
+    x_grid, y_grid = np.meshgrid(xs, ys)
+    cos_dec = math.cos(math.radians(centroid_dec_deg))
+    ra_grid = centroid_ra_deg + x_grid / (3600.0 * max(cos_dec, 1.0e-8))
+    dec_grid = centroid_dec_deg + y_grid / 3600.0
+    xpix_grid, ypix_grid = wcs.world_to_pixel_values(ra_grid, dec_grid)
+    archival_map = sample_map_with_weighted_bilinear(
+        image=residual,
+        valid_mask=np.isfinite(residual),
+        x_coords=np.asarray(xpix_grid, dtype=float),
+        y_coords=np.asarray(ypix_grid, dtype=float),
+    )
+    metadata: dict[str, float] = {
+        "pixel_scale_arcsec": float(pixel_scale_arcsec),
+        "residual_mean": float(np.nanmean(archival_map)),
+        "residual_std": float(np.nanstd(archival_map)),
+        "grid_extent_arcsec": float(extent),
+        "grid_size": float(grid_size),
+    }
+    metadata.update({key: float(value) if isinstance(value, (int, float)) else value for key, value in residual_model.items()})
+    return archival_map, metadata, pixel_scale_arcsec
+
+
+def summarize_residual_map(
+    residual_map: np.ndarray,
+    extent: float,
+    center_x: float,
+    center_y: float,
+) -> dict[str, float | list[float] | dict[str, float]]:
+    residual_threshold = max(1.0e-12, 1.0e-4 * float(np.nanmax(np.abs(residual_map))))
+    residual_resolved = np.where(np.abs(residual_map) >= residual_threshold, residual_map, 0.0)
+    axis_profile = sample_field_along_axis(
+        field=residual_map,
+        extent=extent,
+        center_x=center_x,
+        center_y=center_y,
+        axis_angle_deg=0.0,
+        radial_extent=extent,
+        samples=257,
+    )
+    return {
+        "residual_min": float(np.nanmin(residual_map)),
+        "residual_max": float(np.nanmax(residual_map)),
+        "negative_residual_fraction_resolved": float(np.mean(residual_resolved < 0.0)),
+        "positive_residual_fraction_resolved": float(np.mean(residual_resolved > 0.0)),
+        "resolved_zero_threshold": float(residual_threshold),
+        "residual_sign_flip_positions": axis_profile["sign_flip_positions"],
+        "residual_angular_harmonics": residual_angular_harmonics(
+            residual_map=residual_map,
+            extent=extent,
+            center_x=center_x,
+            center_y=center_y,
+        ),
+        "positive_resolved_region_count": count_connected_regions(residual_resolved > 0.0),
+        "negative_resolved_region_count": count_connected_regions(residual_resolved < 0.0),
+    }
+
+
+def safe_pearson_correlation(x: np.ndarray, y: np.ndarray) -> float:
+    if x.size < 2 or y.size < 2:
+        return float("nan")
+    if float(np.std(x)) == 0.0 or float(np.std(y)) == 0.0:
+        return float("nan")
+    return float(np.corrcoef(x, y)[0, 1])
+
+
+def safe_spearman_correlation(x: np.ndarray, y: np.ndarray) -> float:
+    if x.size < 2 or y.size < 2:
+        return float("nan")
+    value = spearmanr(x, y, nan_policy="omit").statistic
+    return float(value) if np.isfinite(value) else float("nan")
+
+
+def linear_fit_summary(predictor: np.ndarray, response: np.ndarray) -> dict[str, float]:
+    if predictor.size < 2 or response.size < 2:
+        return {"intercept": float("nan"), "slope": float("nan"), "rmse": float("nan")}
+    design = np.column_stack([np.ones(predictor.size), predictor])
+    beta, *_ = np.linalg.lstsq(design, response, rcond=None)
+    fitted = design @ beta
+    rmse = float(np.sqrt(np.mean((response - fitted) ** 2)))
+    return {"intercept": float(beta[0]), "slope": float(beta[1]), "rmse": rmse}
+
+
+def jaccard_index(mask_a: np.ndarray, mask_b: np.ndarray) -> float:
+    union = np.count_nonzero(mask_a | mask_b)
+    if union == 0:
+        return float("nan")
+    return float(np.count_nonzero(mask_a & mask_b) / union)
+
+
+def sample_member_scores_from_map(
+    residual_map: np.ndarray,
+    extent: float,
+    member_specs: list[dict],
+    inner_radius_arcsec: float,
+    ring_inner_arcsec: float,
+    ring_outer_arcsec: float,
+) -> list[dict[str, float]]:
+    pixel_scale = (2.0 * extent) / max(residual_map.shape[1] - 1, 1)
+    footprint = np.isfinite(residual_map)
+    rows = []
+    for spec in member_specs:
+        xpix = (float(spec["center_x"]) + extent) / pixel_scale
+        ypix = (float(spec["center_y"]) + extent) / pixel_scale
+        score = archival_score_cutout(
+            residual=residual_map,
+            footprint=footprint,
+            xpix=xpix,
+            ypix=ypix,
+            pixel_scale_arcsec=pixel_scale,
+            inner_radius_arcsec=inner_radius_arcsec,
+            ring_inner_arcsec=ring_inner_arcsec,
+            ring_outer_arcsec=ring_outer_arcsec,
+        )
+        if score is None:
+            continue
+        rows.append(
+            {
+                "name": str(spec["name"]),
+                "member_mass": float(spec.get("member_mass", float("nan"))),
+                "center_x": float(spec["center_x"]),
+                "center_y": float(spec["center_y"]),
+                **score,
+            }
+        )
+    return rows
+
+
+def compare_theory_and_archival_residuals(
+    theory_map: np.ndarray,
+    archival_map: np.ndarray,
+    extent: float,
+    member_specs: list[dict],
+    inner_radius_arcsec: float,
+    ring_inner_arcsec: float,
+    ring_outer_arcsec: float,
+) -> dict:
+    finite_mask = np.isfinite(theory_map) & np.isfinite(archival_map)
+    theory_values = theory_map[finite_mask]
+    archival_values = archival_map[finite_mask]
+
+    theory_threshold = max(1.0e-12, 1.0e-4 * float(np.nanmax(np.abs(theory_map))))
+    archival_threshold = max(1.0e-12, 1.0e-4 * float(np.nanmax(np.abs(archival_map))))
+    resolved_mask = finite_mask & (np.abs(theory_map) >= theory_threshold) & (np.abs(archival_map) >= archival_threshold)
+
+    comparison = {
+        "finite_pixel_count": int(np.count_nonzero(finite_mask)),
+        "resolved_pixel_count": int(np.count_nonzero(resolved_mask)),
+        "pearson_correlation": safe_pearson_correlation(theory_values, archival_values),
+        "spearman_correlation": safe_spearman_correlation(theory_values, archival_values),
+        "linear_fit_archive_from_theory": linear_fit_summary(theory_values, archival_values),
+    }
+
+    theory_norm = float(np.linalg.norm(theory_values))
+    archival_norm = float(np.linalg.norm(archival_values))
+    if theory_norm > 0.0 and archival_norm > 0.0:
+        comparison["cosine_similarity"] = float(np.dot(theory_values, archival_values) / (theory_norm * archival_norm))
+    else:
+        comparison["cosine_similarity"] = float("nan")
+
+    if np.count_nonzero(resolved_mask) > 0:
+        theory_resolved = theory_map[resolved_mask]
+        archival_resolved = archival_map[resolved_mask]
+        comparison["resolved_sign_agreement_fraction"] = float(np.mean(np.signbit(theory_resolved) == np.signbit(archival_resolved)))
+        comparison["positive_jaccard_resolved"] = jaccard_index(
+            finite_mask & (theory_map >= theory_threshold),
+            finite_mask & (archival_map >= archival_threshold),
+        )
+        comparison["negative_jaccard_resolved"] = jaccard_index(
+            finite_mask & (theory_map <= -theory_threshold),
+            finite_mask & (archival_map <= -archival_threshold),
+        )
+    else:
+        comparison["resolved_sign_agreement_fraction"] = float("nan")
+        comparison["positive_jaccard_resolved"] = float("nan")
+        comparison["negative_jaccard_resolved"] = float("nan")
+
+    theory_harmonics = residual_angular_harmonics(theory_map, extent=extent, center_x=0.0, center_y=0.0)
+    archival_harmonics = residual_angular_harmonics(archival_map, extent=extent, center_x=0.0, center_y=0.0)
+    theory_vector = np.asarray([theory_harmonics[f"m{order}"] for order in range(1, 5)], dtype=float)
+    archival_vector = np.asarray([archival_harmonics[f"m{order}"] for order in range(1, 5)], dtype=float)
+    comparison["harmonic_l2_distance"] = float(np.linalg.norm(theory_vector - archival_vector))
+    comparison["theory_harmonics"] = theory_harmonics
+    comparison["archival_harmonics"] = archival_harmonics
+
+    theory_member_scores = sample_member_scores_from_map(
+        residual_map=theory_map,
+        extent=extent,
+        member_specs=member_specs,
+        inner_radius_arcsec=inner_radius_arcsec,
+        ring_inner_arcsec=ring_inner_arcsec,
+        ring_outer_arcsec=ring_outer_arcsec,
+    )
+    archival_member_scores = sample_member_scores_from_map(
+        residual_map=archival_map,
+        extent=extent,
+        member_specs=member_specs,
+        inner_radius_arcsec=inner_radius_arcsec,
+        ring_inner_arcsec=ring_inner_arcsec,
+        ring_outer_arcsec=ring_outer_arcsec,
+    )
+    archival_by_name = {row["name"]: row for row in archival_member_scores}
+    paired = [
+        {
+            "name": row["name"],
+            "member_mass": row["member_mass"],
+            "theory_sign_flip_score": row["sign_flip_score"],
+            "archival_sign_flip_score": archival_by_name[row["name"]]["sign_flip_score"],
+            "theory_sign_flip_pass": row["sign_flip_pass"],
+            "archival_sign_flip_pass": archival_by_name[row["name"]]["sign_flip_pass"],
+        }
+        for row in theory_member_scores
+        if row["name"] in archival_by_name
+    ]
+    if paired:
+        theory_scores = np.asarray([row["theory_sign_flip_score"] for row in paired], dtype=float)
+        archival_scores = np.asarray([row["archival_sign_flip_score"] for row in paired], dtype=float)
+        comparison["member_score_comparison"] = {
+            "n_paired_members": int(len(paired)),
+            "pearson_correlation": safe_pearson_correlation(theory_scores, archival_scores),
+            "spearman_correlation": safe_spearman_correlation(theory_scores, archival_scores),
+            "linear_fit_archive_from_theory": linear_fit_summary(theory_scores, archival_scores),
+            "sign_flip_pass_agreement_fraction": float(
+                np.mean(
+                    np.asarray([row["theory_sign_flip_pass"] for row in paired], dtype=float)
+                    == np.asarray([row["archival_sign_flip_pass"] for row in paired], dtype=float)
+                )
+            ),
+            "paired_rows": paired,
+        }
+    else:
+        comparison["member_score_comparison"] = {
+            "n_paired_members": 0,
+            "pearson_correlation": float("nan"),
+            "spearman_correlation": float("nan"),
+            "linear_fit_archive_from_theory": {"intercept": float("nan"), "slope": float("nan"), "rmse": float("nan")},
+            "sign_flip_pass_agreement_fraction": float("nan"),
+            "paired_rows": [],
+        }
+
+    return comparison
+
+
+def comparison_objective(comparison: dict) -> float:
+    positive_jaccard = float(comparison.get("positive_jaccard_resolved", float("nan")))
+    negative_jaccard = float(comparison.get("negative_jaccard_resolved", float("nan")))
+    if math.isfinite(positive_jaccard) and math.isfinite(negative_jaccard) and positive_jaccard >= 0.0 and negative_jaccard >= 0.0:
+        overlap_geom = math.sqrt(positive_jaccard * negative_jaccard)
+    else:
+        overlap_geom = 0.0
+    member_block = comparison.get("member_score_comparison", {})
+    member_spearman = float(member_block.get("spearman_correlation", float("nan")))
+    member_pass = float(member_block.get("sign_flip_pass_agreement_fraction", float("nan")))
+    pixel_pearson = float(comparison.get("pearson_correlation", float("nan")))
+    resolved_sign = float(comparison.get("resolved_sign_agreement_fraction", float("nan")))
+    harmonic_l2 = float(comparison.get("harmonic_l2_distance", float("nan")))
+    member_pass_term = member_pass if math.isfinite(member_pass) else 0.0
+    member_spearman_term = 0.75 * max(member_spearman, 0.0) if math.isfinite(member_spearman) else 0.0
+    resolved_sign_term = 0.40 * resolved_sign if math.isfinite(resolved_sign) else 0.0
+    pixel_pearson_term = 0.15 * max(pixel_pearson, 0.0) if math.isfinite(pixel_pearson) else 0.0
+    harmonic_penalty = 0.35 * harmonic_l2 if math.isfinite(harmonic_l2) else 0.0
+    return float(
+        member_pass_term
+        + member_spearman_term
+        + 0.50 * overlap_geom
+        + resolved_sign_term
+        + pixel_pearson_term
+        - harmonic_penalty
+    )
+
+
+def optimize_rigid_alignment(
+    theory_map: np.ndarray,
+    archival_map: np.ndarray,
+    extent: float,
+    member_specs: list[dict],
+    inner_radius_arcsec: float,
+    ring_inner_arcsec: float,
+    ring_outer_arcsec: float,
+    max_shift_arcsec: float,
+    shift_steps: int,
+    max_rotation_deg: float,
+    rotation_steps: int,
+) -> dict:
+    if max_shift_arcsec <= 0.0 and max_rotation_deg <= 0.0:
+        return {
+            "search_performed": False,
+            "best_shift_x_arcsec": 0.0,
+            "best_shift_y_arcsec": 0.0,
+            "best_rotation_deg": 0.0,
+            "best_objective": float("nan"),
+            "best_comparison": {},
+        }
+
+    if shift_steps < 1:
+        raise ValueError("shift_steps must be at least 1.")
+    if rotation_steps < 1:
+        raise ValueError("rotation_steps must be at least 1.")
+
+    shift_values = np.linspace(-max_shift_arcsec, max_shift_arcsec, shift_steps)
+    rotation_values = np.linspace(-max_rotation_deg, max_rotation_deg, rotation_steps)
+    best_payload = None
+
+    for rotation_deg in rotation_values:
+        for shift_x_arcsec in shift_values:
+            for shift_y_arcsec in shift_values:
+                transformed = rigid_transform_map(
+                    image=theory_map,
+                    extent=extent,
+                    shift_x_arcsec=float(shift_x_arcsec),
+                    shift_y_arcsec=float(shift_y_arcsec),
+                    rotation_deg=float(rotation_deg),
+                )
+                comparison = compare_theory_and_archival_residuals(
+                    theory_map=transformed,
+                    archival_map=archival_map,
+                    extent=extent,
+                    member_specs=member_specs,
+                    inner_radius_arcsec=inner_radius_arcsec,
+                    ring_inner_arcsec=ring_inner_arcsec,
+                    ring_outer_arcsec=ring_outer_arcsec,
+                )
+                objective = comparison_objective(comparison)
+                if best_payload is None or objective > best_payload["best_objective"]:
+                    best_payload = {
+                        "search_performed": True,
+                        "best_shift_x_arcsec": float(shift_x_arcsec),
+                        "best_shift_y_arcsec": float(shift_y_arcsec),
+                        "best_rotation_deg": float(rotation_deg),
+                        "best_objective": float(objective),
+                        "best_comparison": comparison,
+                    }
+
+    assert best_payload is not None
+    return best_payload
 
 
 def asymptotic_speed_delta(metric: StaticSphericalPhotonMetric) -> dict:
@@ -1682,44 +2212,38 @@ def command_member_geometry_map(args: argparse.Namespace) -> None:
         member_flag_key=args.member_flag_key,
         ra_key=args.ra_key,
         dec_key=args.dec_key,
+        amplitude_scaling_exponent=args.amplitude_scaling_exponent,
         size_scaling_exponent=args.size_scaling_exponent,
         minimum_size_scale=args.minimum_size_scale,
     )
-    component_payloads = []
-    for spec in component_specs:
-        profile = solve_screened_poisson_cluster_profile(
-            source_kind=args.source_kind,
-            source_amplitude=args.source_amplitude * float(spec.get("amplitude_scale", 1.0)),
-            source_sigma=args.source_sigma * float(spec.get("sigma_scale", 1.0)),
-            source_core_radius=args.source_core_radius * float(spec.get("core_scale", 1.0)),
-            source_scale_radius=args.source_scale_radius * float(spec.get("scale_radius_scale", 1.0)),
-            source_beta=args.source_beta,
-            source_outer_slope=args.source_outer_slope,
-            screening_mass=args.screening_mass,
-            profile_r_max=args.profile_r_max,
-            profile_samples=args.profile_samples,
-        )
-        metric = einstein_scalar_backreaction_metric_from_profile(
-            profile=profile,
-            density_scale=args.density_scale,
-            gravity_scale=args.gravity_scale,
-            exterior_match_tolerance=args.exterior_match_tolerance,
-        )
-        radial_profile = sample_axisymmetric_lensing_profile(
-            metric,
-            impact_min=args.impact_min,
-            impact_max=args.impact_max,
-            samples=args.radial_samples,
-            r_max=args.r_max,
-        )
-        component_payloads.append(
-            {
-                "spec": spec,
-                "source_profile": profile.metadata,
-                "metric_metadata": metric.metadata,
-                "radial_profile": radial_profile,
-            }
-        )
+    background_specs = build_smoothed_background_component_specs(
+        component_specs=component_specs,
+        amplitude_fraction=args.smooth_background_amplitude_fraction,
+        size_multiplier=args.smooth_background_size_multiplier,
+        minimum_size_scale=args.smooth_background_minimum_size_scale,
+        position_shrink=args.smooth_background_position_shrink,
+    )
+    all_component_specs = [*component_specs, *background_specs]
+    component_payloads = build_einstein_component_payloads(
+        component_specs=all_component_specs,
+        source_kind=args.source_kind,
+        source_amplitude=args.source_amplitude,
+        source_sigma=args.source_sigma,
+        source_core_radius=args.source_core_radius,
+        source_scale_radius=args.source_scale_radius,
+        source_beta=args.source_beta,
+        source_outer_slope=args.source_outer_slope,
+        screening_mass=args.screening_mass,
+        density_scale=args.density_scale,
+        gravity_scale=args.gravity_scale,
+        exterior_match_tolerance=args.exterior_match_tolerance,
+        profile_r_max=args.profile_r_max,
+        profile_samples=args.profile_samples,
+        impact_min=args.impact_min,
+        impact_max=args.impact_max,
+        radial_samples=args.radial_samples,
+        r_max=args.r_max,
+    )
 
     map_payload = build_multicomponent_lensing_map(
         component_payloads=component_payloads,
@@ -1734,9 +2258,163 @@ def command_member_geometry_map(args: argparse.Namespace) -> None:
         "scenario": "hff_member_geometry",
         "member_table": str(args.member_table),
         "selection_metadata": selection_metadata,
+        "smooth_background": {
+            "amplitude_fraction": args.smooth_background_amplitude_fraction,
+            "size_multiplier": args.smooth_background_size_multiplier,
+            "minimum_size_scale": args.smooth_background_minimum_size_scale,
+            "position_shrink": args.smooth_background_position_shrink,
+            "n_components": len(background_specs),
+        },
         "components": component_payloads,
         "map": map_payload,
     }
+    print(json.dumps(result, indent=2))
+
+
+def command_compare_hff_member_geometry(args: argparse.Namespace) -> None:
+    component_specs, selection_metadata = load_member_geometry_component_specs(
+        member_table_path=Path(args.member_table),
+        top_members=args.top_members,
+        mass_key=args.mass_key,
+        member_flag_key=args.member_flag_key,
+        ra_key=args.ra_key,
+        dec_key=args.dec_key,
+        amplitude_scaling_exponent=args.amplitude_scaling_exponent,
+        size_scaling_exponent=args.size_scaling_exponent,
+        minimum_size_scale=args.minimum_size_scale,
+    )
+    background_specs = build_smoothed_background_component_specs(
+        component_specs=component_specs,
+        amplitude_fraction=args.smooth_background_amplitude_fraction,
+        size_multiplier=args.smooth_background_size_multiplier,
+        minimum_size_scale=args.smooth_background_minimum_size_scale,
+        position_shrink=args.smooth_background_position_shrink,
+    )
+    all_component_specs = [*component_specs, *background_specs]
+    map_extent = float(args.map_extent)
+    if map_extent <= 0.0:
+        map_extent = suggested_map_extent(
+            component_specs=all_component_specs,
+            padding_arcsec=args.auto_extent_padding_arcsec,
+            minimum_extent=args.minimum_extent_arcsec,
+        )
+    component_payloads = build_einstein_component_payloads(
+        component_specs=all_component_specs,
+        source_kind=args.source_kind,
+        source_amplitude=args.source_amplitude,
+        source_sigma=args.source_sigma,
+        source_core_radius=args.source_core_radius,
+        source_scale_radius=args.source_scale_radius,
+        source_beta=args.source_beta,
+        source_outer_slope=args.source_outer_slope,
+        screening_mass=args.screening_mass,
+        density_scale=args.density_scale,
+        gravity_scale=args.gravity_scale,
+        exterior_match_tolerance=args.exterior_match_tolerance,
+        profile_r_max=args.profile_r_max,
+        profile_samples=args.profile_samples,
+        impact_min=args.impact_min,
+        impact_max=args.impact_max,
+        radial_samples=args.radial_samples,
+        r_max=args.r_max,
+    )
+
+    theory_map_payload = build_multicomponent_lensing_map(
+        component_payloads=component_payloads,
+        extent=map_extent,
+        grid_size=args.grid_size,
+        radial_bin_width=args.radial_bin_width,
+        smooth_sigma_px=args.smooth_sigma_px,
+        axis_samples=args.axis_samples,
+        include_arrays=args.include_map_arrays,
+    )
+    theory_map = np.asarray(theory_map_payload["residual_map"] if args.include_map_arrays else build_multicomponent_lensing_map(
+        component_payloads=component_payloads,
+        extent=map_extent,
+        grid_size=args.grid_size,
+        radial_bin_width=args.radial_bin_width,
+        smooth_sigma_px=args.smooth_sigma_px,
+        axis_samples=args.axis_samples,
+        include_arrays=True,
+    )["residual_map"], dtype=float)
+
+    archival_map, archival_metadata, archival_pixel_scale = build_archival_residual_map_on_member_grid(
+        kappa_path=Path(args.kappa_map),
+        centroid_ra_deg=float(selection_metadata["centroid_ra_deg"]),
+        centroid_dec_deg=float(selection_metadata["centroid_dec_deg"]),
+        extent=map_extent,
+        grid_size=args.grid_size,
+        residual_mode=args.residual_mode,
+        smooth_sigma_px=args.archive_smooth_sigma_px,
+        radial_bin_arcsec=args.archive_radial_bin_arcsec,
+    )
+    archival_summary = summarize_residual_map(
+        residual_map=archival_map,
+        extent=map_extent,
+        center_x=0.0,
+        center_y=0.0,
+    )
+    comparison = compare_theory_and_archival_residuals(
+        theory_map=theory_map,
+        archival_map=archival_map,
+        extent=map_extent,
+        member_specs=component_specs,
+        inner_radius_arcsec=args.inner_radius_arcsec,
+        ring_inner_arcsec=args.ring_inner_arcsec,
+        ring_outer_arcsec=args.ring_outer_arcsec,
+    )
+    alignment = optimize_rigid_alignment(
+        theory_map=theory_map,
+        archival_map=archival_map,
+        extent=map_extent,
+        member_specs=component_specs,
+        inner_radius_arcsec=args.inner_radius_arcsec,
+        ring_inner_arcsec=args.ring_inner_arcsec,
+        ring_outer_arcsec=args.ring_outer_arcsec,
+        max_shift_arcsec=args.alignment_max_shift_arcsec,
+        shift_steps=args.alignment_shift_steps,
+        max_rotation_deg=args.alignment_max_rotation_deg,
+        rotation_steps=args.alignment_rotation_steps,
+    )
+
+    result = {
+        "scenario": "compare_hff_member_geometry",
+        "cluster_label": args.cluster_label,
+        "member_table": str(args.member_table),
+        "kappa_map": str(args.kappa_map),
+        "selection_metadata": selection_metadata,
+        "parameters": {
+            "top_members": args.top_members,
+            "smooth_background_amplitude_fraction": args.smooth_background_amplitude_fraction,
+            "smooth_background_size_multiplier": args.smooth_background_size_multiplier,
+            "smooth_background_minimum_size_scale": args.smooth_background_minimum_size_scale,
+            "smooth_background_position_shrink": args.smooth_background_position_shrink,
+            "smooth_background_component_count": len(background_specs),
+            "map_extent_arcsec": map_extent,
+            "grid_size": args.grid_size,
+            "source_kind": args.source_kind,
+            "archive_residual_mode": args.residual_mode,
+            "archive_smooth_sigma_px": args.archive_smooth_sigma_px,
+            "archive_radial_bin_arcsec": args.archive_radial_bin_arcsec,
+            "score_inner_radius_arcsec": args.inner_radius_arcsec,
+            "score_ring_inner_arcsec": args.ring_inner_arcsec,
+            "score_ring_outer_arcsec": args.ring_outer_arcsec,
+            "alignment_max_shift_arcsec": args.alignment_max_shift_arcsec,
+            "alignment_shift_steps": args.alignment_shift_steps,
+            "alignment_max_rotation_deg": args.alignment_max_rotation_deg,
+            "alignment_rotation_steps": args.alignment_rotation_steps,
+        },
+        "theory_map": theory_map_payload,
+        "archival_map": {
+            "metadata": archival_metadata,
+            "pixel_scale_arcsec": archival_pixel_scale,
+            **archival_summary,
+        },
+        "comparison": comparison,
+        "alignment_search": alignment,
+    }
+    if args.include_map_arrays:
+        result["archival_map"]["residual_map"] = archival_map.tolist()
     print(json.dumps(result, indent=2))
 
 
@@ -1891,6 +2569,7 @@ def build_parser() -> argparse.ArgumentParser:
     member_geometry.add_argument("--member-flag-key", default="is_cluster_member")
     member_geometry.add_argument("--ra-key", default="ra")
     member_geometry.add_argument("--dec-key", default="dec")
+    member_geometry.add_argument("--amplitude-scaling-exponent", type=float, default=1.0)
     member_geometry.add_argument("--size-scaling-exponent", type=float, default=0.5)
     member_geometry.add_argument("--minimum-size-scale", type=float, default=0.2)
     member_geometry.add_argument("--source-kind", choices=["gaussian", "beta_model", "softened_nfw"], default="softened_nfw")
@@ -1915,8 +2594,68 @@ def build_parser() -> argparse.ArgumentParser:
     member_geometry.add_argument("--radial-bin-width", type=float, default=120.0)
     member_geometry.add_argument("--smooth-sigma-px", type=float, default=3.0)
     member_geometry.add_argument("--axis-samples", type=int, default=257)
+    member_geometry.add_argument("--smooth-background-amplitude-fraction", type=float, default=0.0)
+    member_geometry.add_argument("--smooth-background-size-multiplier", type=float, default=4.0)
+    member_geometry.add_argument("--smooth-background-minimum-size-scale", type=float, default=1.0)
+    member_geometry.add_argument("--smooth-background-position-shrink", type=float, default=0.5)
     member_geometry.add_argument("--include-map-arrays", action="store_true")
     member_geometry.set_defaults(func=command_member_geometry_map)
+
+    compare_hff = subparsers.add_parser(
+        "compare-hff-member-geometry",
+        help="Compare archival HFF residual maps against Einstein member-geometry residual maps.",
+    )
+    compare_hff.add_argument("--cluster-label", default="")
+    compare_hff.add_argument("--member-table", required=True)
+    compare_hff.add_argument("--kappa-map", required=True)
+    compare_hff.add_argument("--top-members", type=int, default=25)
+    compare_hff.add_argument("--mass-key", default="mass_neb")
+    compare_hff.add_argument("--member-flag-key", default="is_cluster_member")
+    compare_hff.add_argument("--ra-key", default="ra")
+    compare_hff.add_argument("--dec-key", default="dec")
+    compare_hff.add_argument("--amplitude-scaling-exponent", type=float, default=1.0)
+    compare_hff.add_argument("--size-scaling-exponent", type=float, default=0.5)
+    compare_hff.add_argument("--minimum-size-scale", type=float, default=0.2)
+    compare_hff.add_argument("--source-kind", choices=["gaussian", "beta_model", "softened_nfw"], default="softened_nfw")
+    compare_hff.add_argument("--source-amplitude", type=float, default=1.0e-3)
+    compare_hff.add_argument("--source-sigma", type=float, default=120.0)
+    compare_hff.add_argument("--source-core-radius", type=float, default=60.0)
+    compare_hff.add_argument("--source-scale-radius", type=float, default=350.0)
+    compare_hff.add_argument("--source-beta", type=float, default=0.8)
+    compare_hff.add_argument("--source-outer-slope", type=float, default=3.0)
+    compare_hff.add_argument("--screening-mass", type=float, default=0.01)
+    compare_hff.add_argument("--density-scale", type=float, default=1.0e-6)
+    compare_hff.add_argument("--gravity-scale", type=float, default=1.0)
+    compare_hff.add_argument("--exterior-match-tolerance", type=float, default=1.0e-6)
+    compare_hff.add_argument("--profile-r-max", type=float, default=8.0e3)
+    compare_hff.add_argument("--profile-samples", type=int, default=4096)
+    compare_hff.add_argument("--impact-min", type=float, default=30.0)
+    compare_hff.add_argument("--impact-max", type=float, default=4.0e3)
+    compare_hff.add_argument("--radial-samples", type=int, default=64)
+    compare_hff.add_argument("--r-max", type=float, default=8.0e4)
+    compare_hff.add_argument("--map-extent", type=float, default=0.0)
+    compare_hff.add_argument("--auto-extent-padding-arcsec", type=float, default=80.0)
+    compare_hff.add_argument("--minimum-extent-arcsec", type=float, default=120.0)
+    compare_hff.add_argument("--grid-size", type=int, default=513)
+    compare_hff.add_argument("--radial-bin-width", type=float, default=120.0)
+    compare_hff.add_argument("--smooth-sigma-px", type=float, default=3.0)
+    compare_hff.add_argument("--axis-samples", type=int, default=257)
+    compare_hff.add_argument("--smooth-background-amplitude-fraction", type=float, default=0.0)
+    compare_hff.add_argument("--smooth-background-size-multiplier", type=float, default=4.0)
+    compare_hff.add_argument("--smooth-background-minimum-size-scale", type=float, default=1.0)
+    compare_hff.add_argument("--smooth-background-position-shrink", type=float, default=0.5)
+    compare_hff.add_argument("--residual-mode", choices=["gaussian_highpass", "radial_median", "radial_median_bandpass"], default="radial_median_bandpass")
+    compare_hff.add_argument("--archive-smooth-sigma-px", type=float, default=18.0)
+    compare_hff.add_argument("--archive-radial-bin-arcsec", type=float, default=8.0)
+    compare_hff.add_argument("--inner-radius-arcsec", type=float, default=2.5)
+    compare_hff.add_argument("--ring-inner-arcsec", type=float, default=5.0)
+    compare_hff.add_argument("--ring-outer-arcsec", type=float, default=9.0)
+    compare_hff.add_argument("--alignment-max-shift-arcsec", type=float, default=0.0)
+    compare_hff.add_argument("--alignment-shift-steps", type=int, default=5)
+    compare_hff.add_argument("--alignment-max-rotation-deg", type=float, default=0.0)
+    compare_hff.add_argument("--alignment-rotation-steps", type=int, default=5)
+    compare_hff.add_argument("--include-map-arrays", action="store_true")
+    compare_hff.set_defaults(func=command_compare_hff_member_geometry)
 
     return parser
 

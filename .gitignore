@@ -48,6 +48,12 @@ full_experiment_strongline_metallicity_bandpass/
 full_experiment_muse_deep_core_extraction/
 proxy_catalog_inspect/
 tmp_inputs/
+theory_maps/*-baseline-check.json
+theory_maps/*-background-check.json
+theory_maps/*-checkpoint.json
+theory_maps/einstein-bullet-offset-tight-residual-map.json
+theory_maps/einstein-bullet-offset-wide-residual-map.json
+theory_maps/hff-member-geometry-calibration-summary.json
 
 coq/*.vo
 coq/*.vok
