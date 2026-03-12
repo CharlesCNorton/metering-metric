@@ -247,6 +247,7 @@
   ],
   "executive_summary": {
     "recommended_reading": "For the benchmark family now in the repository, an active-vs-inert Casimir differential becomes an O(10 uPa) problem at alpha ~ 1e-3 near 0.2 um.",
-    "reference_statement": "At 0.2 um and alpha = 0.001, the benchmark differential is 13.0013 uPa and 13.0013 pN for a 1 mm^2 active area."
+    "reference_statement": "At 0.2 um and alpha = 0.001, the benchmark differential is 13.0013 uPa and 13.0013 pN for a 1 mm^2 active area.",
+    "force_context_statement": "That reference force is 43.3375 times the 0.3 pN static-force absolute error quoted in the Decca 2003 Casimir measurement."
   }
 }

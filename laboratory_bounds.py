@@ -30,6 +30,7 @@ import numpy as np
 
 HBAR = 1.054_571_817e-34
 C = 299_792_458.0
+G_NEWTON = 6.674_30e-11
 PI = math.pi
 NM = 1.0e-9
 MICRON = 1.0e-6
@@ -37,6 +38,7 @@ MPA = 1.0e-3
 UPA = 1.0e-6
 NN = 1.0e-9
 PN = 1.0e-12
+PLANCK_TIME = math.sqrt(HBAR * G_NEWTON / (C**5))
 
 
 @dataclass(frozen=True)
@@ -75,9 +77,14 @@ DECCA_2007_RELATIVE = RelativePressureMeasurement(
     note="Published minimum relative experimental error of about 0.19% in the 160-750 nm range.",
 )
 
+DECCA_2003_STATIC_FORCE_ERROR_PN = 0.3
+
 DEFAULT_ALPHA_TARGETS = (1.0e-1, 1.0e-2, 1.0e-3, 1.0e-4)
 DEFAULT_DIFFERENTIAL_ALPHA_TARGETS = (1.0e-2, 1.0e-3, 1.0e-4)
 DEFAULT_DIFFERENTIAL_SEPARATIONS_UM = (0.2, 0.3, 0.5)
+DEFAULT_PLANAR_SEPARATIONS_UM = (0.2, 0.3, 0.5)
+DEFAULT_PLANAR_ALPHA_TARGETS = (1.0e-2, 1.0e-3, 1.0e-4)
+DEFAULT_REFERENCE_LAB_SOURCE_DENSITY = 1.0e40
 
 
 def perfect_conductor_casimir_pressure(separation_m: float) -> float:
@@ -374,6 +381,362 @@ def build_differential_design_report(
                 f"and {reference_row['differential_force_pn']:.6g} pN for a "
                 f"{reference_row['plate_area_mm2']:.6g} mm^2 active area."
             ),
+            "force_context_statement": (
+                f"That reference force is {reference_row['differential_force_pn'] / DECCA_2003_STATIC_FORCE_ERROR_PN:.6g} "
+                f"times the 0.3 pN static-force absolute error quoted in the Decca 2003 Casimir measurement."
+            ),
+        },
+    }
+
+
+def solve_tridiagonal(
+    lower: np.ndarray,
+    diagonal: np.ndarray,
+    upper: np.ndarray,
+    rhs: np.ndarray,
+) -> np.ndarray:
+    n = diagonal.size
+    if n == 0:
+        return np.zeros(0, dtype=float)
+    if n == 1:
+        return np.array([rhs[0] / diagonal[0]], dtype=float)
+
+    c_prime = np.zeros(n - 1, dtype=float)
+    d_prime = np.zeros(n, dtype=float)
+    c_prime[0] = upper[0] / diagonal[0]
+    d_prime[0] = rhs[0] / diagonal[0]
+
+    for index in range(1, n - 1):
+        denominator = diagonal[index] - lower[index - 1] * c_prime[index - 1]
+        c_prime[index] = upper[index] / denominator
+        d_prime[index] = (rhs[index] - lower[index - 1] * d_prime[index - 1]) / denominator
+
+    denominator = diagonal[-1] - lower[-1] * c_prime[-1]
+    d_prime[-1] = (rhs[-1] - lower[-1] * d_prime[-2]) / denominator
+
+    solution = np.zeros(n, dtype=float)
+    solution[-1] = d_prime[-1]
+    for index in range(n - 2, -1, -1):
+        solution[index] = d_prime[index] - c_prime[index] * solution[index + 1]
+    return solution
+
+
+def solve_screened_poisson_1d(
+    positions: np.ndarray,
+    source: np.ndarray,
+    screening_length_m: float,
+) -> np.ndarray:
+    if screening_length_m <= 0.0:
+        raise ValueError("screening_length_m must be positive.")
+    if positions.ndim != 1 or source.ndim != 1 or positions.size != source.size:
+        raise ValueError("positions and source must be 1D arrays of equal length.")
+    if positions.size < 3:
+        raise ValueError("At least three grid points are required.")
+
+    dz = float(positions[1] - positions[0])
+    if not np.allclose(np.diff(positions), dz):
+        raise ValueError("positions must be uniformly spaced.")
+
+    screening_mass = 1.0 / screening_length_m
+    interior_size = positions.size - 2
+    lower = np.full(interior_size - 1, -1.0 / (dz * dz), dtype=float)
+    diagonal = np.full(interior_size, 2.0 / (dz * dz) + screening_mass * screening_mass, dtype=float)
+    upper = np.full(interior_size - 1, -1.0 / (dz * dz), dtype=float)
+    rhs = source[1:-1].astype(float)
+
+    mu = np.zeros_like(source, dtype=float)
+    mu[1:-1] = solve_tridiagonal(lower=lower, diagonal=diagonal, upper=upper, rhs=rhs)
+    return mu
+
+
+def build_double_slab_source(
+    positions: np.ndarray,
+    gap_m: float,
+    plate_thickness_m: float,
+    source_strength: float,
+) -> np.ndarray:
+    if gap_m <= 0.0:
+        raise ValueError("gap_m must be positive.")
+    if plate_thickness_m <= 0.0:
+        raise ValueError("plate_thickness_m must be positive.")
+    left_inner = -0.5 * gap_m - plate_thickness_m
+    left_outer = -0.5 * gap_m
+    right_inner = 0.5 * gap_m
+    right_outer = 0.5 * gap_m + plate_thickness_m
+    source = np.zeros_like(positions, dtype=float)
+    left_mask = (positions >= left_inner) & (positions <= left_outer)
+    right_mask = (positions >= right_inner) & (positions <= right_outer)
+    source[left_mask | right_mask] = source_strength
+    return source
+
+
+def planar_scalar_normal_pressure(
+    mu: np.ndarray,
+    positions: np.ndarray,
+    screening_length_m: float,
+) -> np.ndarray:
+    screening_mass = 1.0 / screening_length_m
+    mu_prime = np.gradient(mu, positions)
+    return 0.5 * (mu_prime * mu_prime - (screening_mass * screening_mass) * (mu * mu))
+
+
+def planar_pressure_difference(
+    positions: np.ndarray,
+    normal_pressure: np.ndarray,
+    gap_m: float,
+    plate_thickness_m: float,
+) -> dict:
+    gap_mask = np.abs(positions) <= 0.5 * gap_m
+    outer_extent = float(np.max(np.abs(positions)))
+    exterior_threshold = min(
+        outer_extent * 0.85,
+        0.5 * gap_m + plate_thickness_m + 0.15 * outer_extent,
+    )
+    exterior_mask = np.abs(positions) >= exterior_threshold
+    if np.count_nonzero(exterior_mask) < 8:
+        exterior_mask = np.abs(positions) >= 0.8 * outer_extent
+
+    gap_pressure = float(np.mean(normal_pressure[gap_mask]))
+    exterior_pressure = float(np.mean(normal_pressure[exterior_mask]))
+    signed_difference = exterior_pressure - gap_pressure
+    return {
+        "gap_pressure": gap_pressure,
+        "exterior_pressure": exterior_pressure,
+        "signed_pressure_difference": signed_difference,
+        "pressure_magnitude": abs(signed_difference),
+        "pressure_sign": 0 if signed_difference == 0.0 else int(math.copysign(1.0, signed_difference)),
+    }
+
+
+def planar_double_slab_pressure_base_units(
+    gap_m: float,
+    plate_thickness_m: float,
+    screening_length_m: float,
+    source_strength: float,
+) -> float:
+    if gap_m <= 0.0:
+        raise ValueError("gap_m must be positive.")
+    if plate_thickness_m <= 0.0:
+        raise ValueError("plate_thickness_m must be positive.")
+    if screening_length_m <= 0.0:
+        raise ValueError("screening_length_m must be positive.")
+    screening_mass = 1.0 / screening_length_m
+    slab_factor = 1.0 - math.exp(-screening_mass * plate_thickness_m)
+    return (
+        source_strength
+        * source_strength
+        * math.exp(-screening_mass * gap_m)
+        * slab_factor
+        * slab_factor
+        / (2.0 * screening_mass * screening_mass)
+    )
+
+
+def build_planar_slab_geometry_report(
+    separations_m: Iterable[float],
+    alpha_targets: Iterable[float],
+    anomaly_factor_at_alpha_one: float,
+    scaling_power: float,
+    plate_area_m2: float,
+    plate_thickness_m: float,
+    screening_length_m: float,
+    source_strength: float,
+    force_floor_n: float,
+    samples: int,
+    domain_half_width_m: float,
+    reference_separation_m: float,
+    reference_lab_source_density: float,
+) -> dict:
+    if samples < 33 or samples % 2 == 0:
+        raise ValueError("samples must be an odd integer >= 33.")
+    if domain_half_width_m <= 0.0:
+        raise ValueError("domain_half_width_m must be positive.")
+
+    separations = sorted({float(reference_separation_m), *[float(value) for value in separations_m]})
+    positions = np.linspace(-domain_half_width_m, domain_half_width_m, samples)
+    base_rows = []
+
+    for gap_m in separations:
+        source = build_double_slab_source(
+            positions=positions,
+            gap_m=gap_m,
+            plate_thickness_m=plate_thickness_m,
+            source_strength=source_strength,
+        )
+        mu = solve_screened_poisson_1d(
+            positions=positions,
+            source=source,
+            screening_length_m=screening_length_m,
+        )
+        normal_pressure = planar_scalar_normal_pressure(
+            mu=mu,
+            positions=positions,
+            screening_length_m=screening_length_m,
+        )
+        pressure_summary = planar_pressure_difference(
+            positions=positions,
+            normal_pressure=normal_pressure,
+            gap_m=gap_m,
+            plate_thickness_m=plate_thickness_m,
+        )
+        analytic_base_pressure = planar_double_slab_pressure_base_units(
+            gap_m=gap_m,
+            plate_thickness_m=plate_thickness_m,
+            screening_length_m=screening_length_m,
+            source_strength=source_strength,
+        )
+        base_rows.append(
+            {
+                "gap_m": float(gap_m),
+                "gap_um": float(gap_m / MICRON),
+                "source_integral": float(np.trapezoid(source, positions)),
+                "max_mu": float(np.max(mu)),
+                "midgap_mu": float(np.interp(0.0, positions, mu)),
+                "gap_pressure_base_units": float(pressure_summary["gap_pressure"]),
+                "exterior_pressure_base_units": float(pressure_summary["exterior_pressure"]),
+                "signed_pressure_difference_base_units": float(pressure_summary["signed_pressure_difference"]),
+                "pressure_magnitude_base_units": float(pressure_summary["pressure_magnitude"]),
+                "analytic_pressure_magnitude_base_units": float(analytic_base_pressure),
+                "numeric_to_analytic_ratio": float(
+                    pressure_summary["pressure_magnitude"] / analytic_base_pressure
+                    if analytic_base_pressure > 0.0
+                    else math.nan
+                ),
+                "pressure_sign": int(pressure_summary["pressure_sign"]),
+            }
+        )
+
+    reference_row = min(base_rows, key=lambda row: abs(row["gap_m"] - reference_separation_m))
+    reference_base_pressure = max(reference_row["pressure_magnitude_base_units"], 1.0e-30)
+    reference_target_pressure = anomaly_factor_at_alpha_one * perfect_conductor_casimir_pressure(reference_separation_m)
+    calibrated_density_scale = reference_target_pressure / reference_base_pressure
+    effective_source_strength = source_strength * math.sqrt(calibrated_density_scale)
+    source_conversion_factor = effective_source_strength / reference_lab_source_density
+    naive_causal_conversion = 1.0 / (C * screening_length_m)
+    effective_persistence_time_s = source_conversion_factor * screening_length_m * screening_length_m
+
+    design_rows = []
+    for row in base_rows:
+        alpha_one_pressure = calibrated_density_scale * row["pressure_magnitude_base_units"]
+        alpha_one_pressure_analytic = calibrated_density_scale * row["analytic_pressure_magnitude_base_units"]
+        pure_benchmark_alpha_one = anomaly_factor_at_alpha_one * perfect_conductor_casimir_pressure(row["gap_m"])
+        geometry_modifier = alpha_one_pressure / pure_benchmark_alpha_one if pure_benchmark_alpha_one > 0.0 else math.nan
+        analytic_geometry_modifier = (
+            alpha_one_pressure_analytic / pure_benchmark_alpha_one if pure_benchmark_alpha_one > 0.0 else math.nan
+        )
+        for alpha_target in alpha_targets:
+            predicted_pressure = alpha_one_pressure * alpha_target**scaling_power
+            predicted_pressure_analytic = alpha_one_pressure_analytic * alpha_target**scaling_power
+            predicted_force = predicted_pressure * plate_area_m2
+            predicted_force_analytic = predicted_pressure_analytic * plate_area_m2
+            required_area = force_floor_n / predicted_pressure if predicted_pressure > 0.0 else math.inf
+            design_rows.append(
+                {
+                    "gap_m": row["gap_m"],
+                    "gap_um": row["gap_um"],
+                    "alpha_target": float(alpha_target),
+                    "pressure_sign": row["pressure_sign"],
+                    "alpha_one_pressure_pa": float(alpha_one_pressure),
+                    "alpha_one_pressure_pa_analytic": float(alpha_one_pressure_analytic),
+                    "pure_benchmark_alpha_one_pressure_pa": float(pure_benchmark_alpha_one),
+                    "geometry_modifier_vs_pure_benchmark": float(geometry_modifier),
+                    "geometry_modifier_vs_pure_benchmark_analytic": float(analytic_geometry_modifier),
+                    "predicted_differential_pressure_pa": float(predicted_pressure),
+                    "predicted_differential_pressure_pa_analytic": float(predicted_pressure_analytic),
+                    "predicted_differential_pressure_upa": float(predicted_pressure / UPA),
+                    "predicted_differential_pressure_upa_analytic": float(predicted_pressure_analytic / UPA),
+                    "predicted_differential_force_n": float(predicted_force),
+                    "predicted_differential_force_n_analytic": float(predicted_force_analytic),
+                    "predicted_differential_force_pn": float(predicted_force / PN),
+                    "predicted_differential_force_pn_analytic": float(predicted_force_analytic / PN),
+                    "plate_area_m2": float(plate_area_m2),
+                    "plate_area_mm2": float(plate_area_m2 * 1.0e6),
+                    "force_floor_n": float(force_floor_n),
+                    "force_floor_pn": float(force_floor_n / PN),
+                    "minimum_plate_area_for_force_floor_m2": float(required_area),
+                    "minimum_plate_area_for_force_floor_mm2": float(required_area * 1.0e6),
+                }
+            )
+
+    reference_design = min(
+        design_rows,
+        key=lambda row: (abs(row["gap_um"] - reference_separation_m / MICRON), abs(math.log10(row["alpha_target"]) + 3.0)),
+    )
+    return {
+        "field_model": {
+            "equation": "-mu'' + m_mu^2 mu = J(z)",
+            "plate_thickness_m": float(plate_thickness_m),
+            "plate_thickness_um": float(plate_thickness_m / MICRON),
+            "screening_length_m": float(screening_length_m),
+            "screening_length_um": float(screening_length_m / MICRON),
+            "source_strength": float(source_strength),
+            "domain_half_width_m": float(domain_half_width_m),
+            "domain_half_width_um": float(domain_half_width_m / MICRON),
+            "samples": int(samples),
+            "statement": (
+                "This report derives a geometry-dependent slab pressure scale from the screened metering field equation "
+                "and the canonical scalar normal-stress profile, then calibrates that scale to the repository's "
+                "reference anomaly amplitude at the chosen reference gap."
+            ),
+        },
+        "benchmark_calibration": {
+            "reference_separation_m": float(reference_separation_m),
+            "reference_separation_um": float(reference_separation_m / MICRON),
+            "anomaly_factor_at_alpha_one": float(anomaly_factor_at_alpha_one),
+            "scaling_power": float(scaling_power),
+            "reference_target_pressure_pa": float(reference_target_pressure),
+            "reference_base_pressure": float(reference_base_pressure),
+            "calibrated_density_scale": float(calibrated_density_scale),
+        },
+        "source_normalization_gap": {
+            "effective_source_strength_required": float(effective_source_strength),
+            "reference_lab_source_density": float(reference_lab_source_density),
+            "effective_conversion_factor": float(source_conversion_factor),
+            "naive_causal_conversion_factor": float(naive_causal_conversion),
+            "conversion_vs_naive_causal": float(source_conversion_factor / naive_causal_conversion),
+            "effective_persistence_time_s": float(effective_persistence_time_s),
+            "effective_persistence_time_in_planck_units": float(effective_persistence_time_s / PLANCK_TIME),
+            "statement": (
+                "This is the remaining laboratory normalization gap in one number: the effective planar source strength "
+                "needed to reproduce the reference pressure, and the implied conversion from the repository's laboratory "
+                "decoherence-rate-density scale to the static screened source entering the slab equation."
+            ),
+        },
+        "closed_form_model": {
+            "pressure_formula": "P(g) = J0^2 * exp(-m_mu g) * (1 - exp(-m_mu t))^2 / (2 m_mu^2)",
+            "statement": (
+                "This is the exact planar double-slab interaction pressure for the linear screened field equation, "
+                "before benchmark amplitude calibration."
+            ),
+        },
+        "base_gap_rows": base_rows,
+        "design_rows": design_rows,
+        "reference_design_point": reference_design,
+        "executive_summary": {
+            "recommended_reading": (
+                "This is the first geometry-dependent laboratory signal model in the repository with an exact "
+                "closed-form slab interaction law. It keeps the benchmark amplitude fixed at the reference gap "
+                "but replaces the pure 1/a^4 extrapolation with a screened-field interaction shape."
+            ),
+            "reference_statement": (
+                f"At {reference_design['gap_um']:.3g} um and alpha = {reference_design['alpha_target']:.3g}, "
+                f"the planar slab model predicts {reference_design['predicted_differential_pressure_upa_analytic']:.6g} uPa "
+                f"and {reference_design['predicted_differential_force_pn_analytic']:.6g} pN for a "
+                f"{reference_design['plate_area_mm2']:.6g} mm^2 active area."
+            ),
+            "normalization_statement": (
+                f"Matching the reference gap requires an effective slab source strength of {effective_source_strength:.6g}, "
+                f"which corresponds to a conversion factor of {source_conversion_factor:.6g} relative to the repository's "
+                f"laboratory decoherence-rate-density scale {reference_lab_source_density:.6g}. "
+                f"That is {source_conversion_factor / naive_causal_conversion:.6g} times the naive causal screening scale "
+                f"1/(c l_s). If read as a simple persistence-time bridge kappa = tau/l_s^2, the implied timescale "
+                f"is {effective_persistence_time_s:.6g} s = {effective_persistence_time_s / PLANCK_TIME:.6g} t_P."
+            ),
+            "force_context_statement": (
+                f"The reference differential force {reference_design['predicted_differential_force_pn_analytic']:.6g} pN is "
+                f"{reference_design['predicted_differential_force_pn_analytic'] / DECCA_2003_STATIC_FORCE_ERROR_PN:.6g} "
+                f"times the 0.3 pN static-force absolute error quoted in the Decca 2003 Casimir measurement."
+            ),
         },
     }
 
@@ -489,6 +852,25 @@ def command_casimir_differential_design(args: argparse.Namespace) -> None:
     write_json_report(report, args.out)
 
 
+def command_casimir_planar_slab_report(args: argparse.Namespace) -> None:
+    report = build_planar_slab_geometry_report(
+        separations_m=[value * MICRON for value in args.separations_um],
+        alpha_targets=args.alpha_targets,
+        anomaly_factor_at_alpha_one=args.anomaly_factor_at_alpha_one,
+        scaling_power=args.scaling_power,
+        plate_area_m2=args.plate_area_mm2 * 1.0e-6,
+        plate_thickness_m=args.plate_thickness_um * MICRON,
+        screening_length_m=args.screening_length_um * MICRON,
+        source_strength=args.source_strength,
+        force_floor_n=args.force_floor_pn * PN,
+        samples=args.samples,
+        domain_half_width_m=args.domain_half_width_um * MICRON,
+        reference_separation_m=args.reference_separation_um * MICRON,
+        reference_lab_source_density=args.reference_lab_source_density,
+    )
+    write_json_report(report, args.out)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Laboratory-side benchmark bounds for the metering-metric coupling.",
@@ -531,6 +913,36 @@ def build_parser() -> argparse.ArgumentParser:
     differential.add_argument("--force-floor-pn", type=float, default=10.0)
     differential.add_argument("--out", type=str, default=None)
     differential.set_defaults(func=command_casimir_differential_design)
+
+    planar = subparsers.add_parser(
+        "casimir-planar-slab-report",
+        help="Build a geometry-dependent slab-field Casimir signal report.",
+    )
+    planar.add_argument("--anomaly-factor-at-alpha-one", type=float, default=16.0)
+    planar.add_argument("--scaling-power", type=float, default=2.0)
+    planar.add_argument("--reference-separation-um", type=float, default=0.2)
+    planar.add_argument(
+        "--separations-um",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_PLANAR_SEPARATIONS_UM),
+    )
+    planar.add_argument(
+        "--alpha-targets",
+        type=float,
+        nargs="+",
+        default=list(DEFAULT_PLANAR_ALPHA_TARGETS),
+    )
+    planar.add_argument("--plate-area-mm2", type=float, default=1.0)
+    planar.add_argument("--plate-thickness-um", type=float, default=0.05)
+    planar.add_argument("--screening-length-um", type=float, default=0.2)
+    planar.add_argument("--source-strength", type=float, default=1.0)
+    planar.add_argument("--force-floor-pn", type=float, default=10.0)
+    planar.add_argument("--samples", type=int, default=4001)
+    planar.add_argument("--domain-half-width-um", type=float, default=2.0)
+    planar.add_argument("--reference-lab-source-density", type=float, default=DEFAULT_REFERENCE_LAB_SOURCE_DENSITY)
+    planar.add_argument("--out", type=str, default=None)
+    planar.set_defaults(func=command_casimir_planar_slab_report)
 
     return parser
 

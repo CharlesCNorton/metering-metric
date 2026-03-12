@@ -11,6 +11,6 @@
 9. Rebuild `lensing.py` around confounder control: mass, radius, redshift, magnification, local convergence, and model family.
 10. Require every complexity or decoherence proxy to show conditional signal beyond mass.
 11. Upgrade the proxy inputs before expanding the cluster sample.
-12. Derive the laboratory Casimir signal from the covariant theory and map it onto the active-vs-inert differential design.
+12. Close the source-normalization bridge between metering density and the exact screened-slab laboratory interaction law.
 13. Rewrite `README.md` as a disciplined technical argument.
 14. Split the outputs into separate rigorous products: core theory, analogue evidence, and observational result.
