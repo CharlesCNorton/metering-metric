@@ -13,6 +13,7 @@ This is not a restatement of relational time. It is a specific coupling proposal
 ## Table of Contents
 
 - [Evidence Boundary](#evidence-boundary)
+- [Claim Ladder](#claim-ladder)
 - [Framework](#framework)
 - [Core Theorems](#core-theorems)
 - [The Metering Source](#the-metering-source)
@@ -45,6 +46,19 @@ This repository mixes several different kinds of support, and they should not be
 - **Hardware-backed:** the IBM Quantum section is evidence for discrete bound-state structure in the tested lattice model, not a direct measurement of the physical spacetime coupling constant.
 - **Archival observational program:** the cluster-lensing section currently runs on two HFF fields, a hardened radial-median-bandpass residual, BUFFALO v2 photometric catalogs, public MUSE spectroscopic catalogs, deeper external spectroscopy for membership hardening, public `MUSE-DEEP` core-cube extractions, and 22 independent lens-model families. The sign-flip morphology survives those checks. The most stable explanatory axes are local convergence and stellar mass. Generic spectroscopic structure, line-ratio proxies, first strong-line metallicity estimators, and the current public matched-depth core-cube route do not yield a same-sign replicated abundance-style proxy across both clusters under the present controls.
 - **Open empirical question:** the cosmological interpretation, observer-detection ideas, and any claim that the measured morphology tracks decoherence-rate proxies beyond mass and local convergence remain open. The observational proxy lane is exhausted on current public data. Two later observational pursuits remain well-defined: redder symmetric spectroscopy for both clusters with usable `Halpha`, `[N II]`, `Hbeta`, and `[O III]` coverage, and direct per-galaxy abundance tables with one-to-one mapping into the HFF member catalogs. Until such data exist, the active focus shifts to deriving the 3+1D lensing observable from the field equations.
+
+---
+
+## Claim Ladder
+
+The repository now supports a cleaner claim hierarchy:
+
+- **Established within the current project:** the mass-gap mechanism is the working core. The abstract theorem spine in [`meteringmetric.v`](./meteringmetric.v) supports horizon formation, confinement-barrier structure, and proper-time vanishing in the present theorem-level scope. The lattice and hardware program supports discrete bound-state structure for the tested $1/N^2$ potential. The archival lensing program supports a reproducible sign-flip-like residual morphology, with local convergence and stellar mass as the stable explanatory axes on current public data.
+- **Supported but not finished:** a viable 3+1D Einstein-backreaction branch exists in [`three_plus_one_lensing.py`](./three_plus_one_lensing.py). In that branch, raw convergence remains nonnegative in the tested cluster-style maps, but sign-changing residual morphology appears in multi-component, HFF-member, and calibrated member-plus-envelope geometries. Direct archive comparison improves under that calibration, and a rigid-alignment audit shows that part of the remaining mismatch is registration-sensitive.
+- **Open:** a full 3+1D observable derivation is still needed. The current theory program has not yet turned the viable branch into a quantitatively competitive field-level match to the archival residual maps. A continuum finite-dimensionality theorem remains open. A physical measurement of the spacetime coupling $\alpha$ remains open. On the observational side, the next clean empirical step would require redder symmetric spectroscopy or direct abundance tables for both clusters.
+- **Not supported yet:** the repository does **not** currently support the stronger claim that the archival cluster morphology tracks decoherence-rate or abundance-style proxies beyond mass and local convergence. It does **not** yet support a raw 3+1D negative-$\kappa$ prediction in the viable branch. It does **not** yet support treating the explicit photon-sector branch as the mainline completion.
+
+This ladder is the current intended reading of the project: the core metering mechanism remains alive, the observational proxy claim has not cleared the bar, and the active bridge to reality is the 3+1D Einstein-backreaction lensing program.
 
 ---
 
