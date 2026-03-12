@@ -1,0 +1,178 @@
+{
+  "rows": [
+    {
+      "smooth_background_shift_parallel_arcsec": 0.0,
+      "global_summary": {
+        "n_models": 22,
+        "median_objective": 1.1701443013424813,
+        "median_pixel_pearson": -0.003944324665493191,
+        "median_pixel_spearman": 0.08810197246468199,
+        "median_resolved_sign_agreement": 0.4839142308524869,
+        "median_positive_jaccard": 0.10846228799100449,
+        "median_negative_jaccard": 0.25754161623289906,
+        "median_harmonic_l2": 0.20274522217740795,
+        "median_member_score_pearson": 0.15257896501165988,
+        "median_member_score_spearman": 0.1542669687677134,
+        "median_member_pass_agreement": 0.8377192982456141
+      },
+      "aligned_global_summary": {
+        "n_models": 22,
+        "median_objective": 1.357753374485509,
+        "median_pixel_pearson": 0.0058926016768835274,
+        "median_pixel_spearman": 0.10318912272843567,
+        "median_resolved_sign_agreement": 0.49060768706109253,
+        "median_positive_jaccard": 0.10578578433102093,
+        "median_negative_jaccard": 0.2713464647911827,
+        "median_harmonic_l2": 0.16542768525618434,
+        "median_member_score_pearson": 0.24453271632640317,
+        "median_member_score_spearman": 0.3913574409097215,
+        "median_member_pass_agreement": 0.875
+      },
+      "cluster_summaries": {
+        "abell370": {
+          "summary": {
+            "n_models": 11,
+            "median_objective": 1.2839651819569584,
+            "median_pixel_pearson": -0.0012425392721769517,
+            "median_pixel_spearman": 0.14030753930849962,
+            "median_resolved_sign_agreement": 0.5499063947186915,
+            "median_positive_jaccard": 0.09937456567060458,
+            "median_negative_jaccard": 0.2734274711168164,
+            "median_harmonic_l2": 0.19632761132749343,
+            "median_member_score_pearson": 0.16631309639369973,
+            "median_member_score_spearman": 0.21733204681683144,
+            "median_member_pass_agreement": 0.868421052631579
+          },
+          "aligned_summary": {
+            "n_models": 11,
+            "median_objective": 1.5276384044769238,
+            "median_pixel_pearson": 0.007798062682341463,
+            "median_pixel_spearman": 0.125104170777761,
+            "median_resolved_sign_agreement": 0.5251330573625074,
+            "median_positive_jaccard": 0.10140562248995984,
+            "median_negative_jaccard": 0.2904775360271263,
+            "median_harmonic_l2": 0.14980733123960888,
+            "median_member_score_pearson": 0.24228215189758542,
+            "median_member_score_spearman": 0.48429463784692617,
+            "median_member_pass_agreement": 0.9
+          }
+        },
+        "rxcj2248": {
+          "summary": {
+            "n_models": 11,
+            "median_objective": 1.02868255026413,
+            "median_pixel_pearson": -0.0045554009200203,
+            "median_pixel_spearman": 0.06596139930168603,
+            "median_resolved_sign_agreement": 0.4407299270072993,
+            "median_positive_jaccard": 0.11755001031140441,
+            "median_negative_jaccard": 0.25057552682840445,
+            "median_harmonic_l2": 0.20916283302732247,
+            "median_member_score_pearson": 0.13884483362962002,
+            "median_member_score_spearman": 0.10404353128811333,
+            "median_member_pass_agreement": 0.8125
+          },
+          "aligned_summary": {
+            "n_models": 11,
+            "median_objective": 1.2718911253753182,
+            "median_pixel_pearson": 0.003128273866608185,
+            "median_pixel_spearman": 0.08127407467911031,
+            "median_resolved_sign_agreement": 0.47978881372710774,
+            "median_positive_jaccard": 0.110165946172082,
+            "median_negative_jaccard": 0.262953995157385,
+            "median_harmonic_l2": 0.1810480392727598,
+            "median_member_score_pearson": 0.24678328075522088,
+            "median_member_score_spearman": 0.34756469656810324,
+            "median_member_pass_agreement": 0.85
+          }
+        }
+      }
+    },
+    {
+      "smooth_background_shift_parallel_arcsec": -10.0,
+      "global_summary": {
+        "n_models": 22,
+        "median_objective": 1.1005616652392147,
+        "median_pixel_pearson": -0.005825021155850825,
+        "median_pixel_spearman": 0.08349199894913727,
+        "median_resolved_sign_agreement": 0.47191872297675425,
+        "median_positive_jaccard": 0.11645779649080415,
+        "median_negative_jaccard": 0.25556473010344594,
+        "median_harmonic_l2": 0.1934553658882892,
+        "median_member_score_pearson": 0.1448097770363594,
+        "median_member_score_spearman": 0.1683945241488472,
+        "median_member_pass_agreement": 0.8
+      },
+      "aligned_global_summary": {
+        "n_models": 22,
+        "median_objective": 1.3716367589138516,
+        "median_pixel_pearson": 0.003665993990552008,
+        "median_pixel_spearman": 0.0966961808512708,
+        "median_resolved_sign_agreement": 0.5047237394904454,
+        "median_positive_jaccard": 0.1119554704062973,
+        "median_negative_jaccard": 0.2605811664064091,
+        "median_harmonic_l2": 0.1820833002952629,
+        "median_member_score_pearson": 0.2459091883125688,
+        "median_member_score_spearman": 0.4011415659957593,
+        "median_member_pass_agreement": 0.8717105263157895
+      },
+      "cluster_summaries": {
+        "abell370": {
+          "summary": {
+            "n_models": 11,
+            "median_objective": 1.127582557281935,
+            "median_pixel_pearson": -0.0049497286923330126,
+            "median_pixel_spearman": 0.12814688773357613,
+            "median_resolved_sign_agreement": 0.5256048387096774,
+            "median_positive_jaccard": 0.11270003404834865,
+            "median_negative_jaccard": 0.2892451569806279,
+            "median_harmonic_l2": 0.18350488885378066,
+            "median_member_score_pearson": 0.10002967083856165,
+            "median_member_score_spearman": 0.15377384498108046,
+            "median_member_pass_agreement": 0.825
+          },
+          "aligned_summary": {
+            "n_models": 11,
+            "median_objective": 1.451907964433686,
+            "median_pixel_pearson": 0.013574964222415964,
+            "median_pixel_spearman": 0.15757757972680594,
+            "median_resolved_sign_agreement": 0.5168096223996845,
+            "median_positive_jaccard": 0.1163586584531143,
+            "median_negative_jaccard": 0.28752136752136753,
+            "median_harmonic_l2": 0.1824090130693145,
+            "median_member_score_pearson": 0.1672014552489121,
+            "median_member_score_spearman": 0.42985934442435986,
+            "median_member_pass_agreement": 0.9
+          }
+        },
+        "rxcj2248": {
+          "summary": {
+            "n_models": 11,
+            "median_objective": 1.0609791336604462,
+            "median_pixel_pearson": -0.008022182345636307,
+            "median_pixel_spearman": 0.04199811294232983,
+            "median_resolved_sign_agreement": 0.43642335766423357,
+            "median_positive_jaccard": 0.12021555893325964,
+            "median_negative_jaccard": 0.24303486945855968,
+            "median_harmonic_l2": 0.20340584292279776,
+            "median_member_score_pearson": 0.17187399197536676,
+            "median_member_score_spearman": 0.18508613035692478,
+            "median_member_pass_agreement": 0.775
+          },
+          "aligned_summary": {
+            "n_models": 11,
+            "median_objective": 1.2794791036710713,
+            "median_pixel_pearson": 0.0023406548853510804,
+            "median_pixel_spearman": 0.08837895792415235,
+            "median_resolved_sign_agreement": 0.463784853984491,
+            "median_positive_jaccard": 0.1075522823594803,
+            "median_negative_jaccard": 0.25374161362463443,
+            "median_harmonic_l2": 0.1817575875212113,
+            "median_member_score_pearson": 0.24933422196843646,
+            "median_member_score_spearman": 0.37598024255945706,
+            "median_member_pass_agreement": 0.85
+          }
+        }
+      }
+    }
+  ]
+}

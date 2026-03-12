@@ -56,7 +56,7 @@ The repository now supports a cleaner claim hierarchy:
 
 - **Established within the current project:** the mass-gap mechanism is the working core. The abstract theorem spine in [`meteringmetric.v`](./meteringmetric.v) supports horizon formation, confinement-barrier structure, and proper-time vanishing in the present theorem-level scope. The lattice and hardware program supports discrete bound-state structure for the tested $1/N^2$ potential. The archival lensing program supports a reproducible sign-flip-like residual morphology, with local convergence and stellar mass as the stable explanatory axes on current public data.
 - **Supported but not finished:** a viable 3+1D Einstein-backreaction branch exists in [`three_plus_one_lensing.py`](./three_plus_one_lensing.py). In that branch, raw convergence remains nonnegative in the tested cluster-style maps, but sign-changing residual morphology appears in multi-component, HFF-member, and calibrated member-plus-envelope geometries. Direct archive comparison improves under that calibration, and a rigid-alignment audit shows that part of the remaining mismatch is registration-sensitive.
-- **Open:** a full 3+1D observable derivation is still needed. The current theory program has not yet turned the viable branch into a quantitatively competitive field-level match to the archival residual maps. A continuum finite-dimensionality theorem remains open. A direct first-principles physical measurement of the spacetime coupling $\alpha$ remains open, even though the repository now contains a measurement-anchored Casimir benchmark null bound, a differential design target, an exact planar screened-slab interaction law, and a first viable source-bridge family. On the laboratory side, the remaining gap is no longer force scaling and no longer an unconstrained normalization constant; it is the covariant fixation of the occupancy bridge parameters $(\eta_J, \tau_p, L_\perp)$. On the observational side, the next clean empirical step would require redder symmetric spectroscopy or direct abundance tables for both clusters.
+- **Open:** a full 3+1D observable derivation is still needed. The current theory program has not yet turned the viable branch into a quantitatively competitive field-level match to the archival residual maps. A continuum finite-dimensionality theorem remains open. A direct first-principles physical measurement of the spacetime coupling $\alpha$ remains open, even though the repository now contains a measurement-anchored Casimir benchmark null bound, a differential design target, an exact planar screened-slab interaction law, and a first viable source-bridge family. On the laboratory side, the remaining gap is no longer force scaling and no longer an unconstrained normalization constant; it is the covariant fixation of the occupancy bridge parameters $(\eta_J, \tau_p, L_\perp)$. On the lensing side, the present Einstein scaffold fixes only a composite backreaction scale rather than the source bridge parameters separately. On the observational side, the next clean empirical step would require redder symmetric spectroscopy or direct abundance tables for both clusters.
 - **Not supported yet:** the repository does **not** currently support the stronger claim that the archival cluster morphology tracks decoherence-rate or abundance-style proxies beyond mass and local convergence. It does **not** yet support a raw 3+1D negative-$\kappa$ prediction in the viable branch. It does **not** yet support treating the explicit photon-sector branch as the mainline completion.
 
 This ladder is the current intended reading of the project: the core metering mechanism remains alive, the observational proxy claim has not cleared the bar, and the active bridge to reality is the 3+1D Einstein-backreaction lensing program.
@@ -358,25 +358,130 @@ the benchmark differential is `13.0 uPa` or `13.0 pN`, with required common-mode
 
 ### Action and Dynamics
 
-The metering field $\mu(x, t)$ has its own dynamics:
+The active completion is now a preferred-frame covariant theory with four ingredients:
 
-$$S_\mu = \int \left[ \frac{(\partial_t \mu)^2}{2N} - \frac{N(\partial_x \mu)^2}{2} - N \cdot V(\mu) + N \cdot J \cdot \mu \right] dx \, dt$$
+- a spacetime metric $g_{ab}$
+- a metering scalar $\mu$
+- a unit timelike frame $u^a$
+- massive matter fields $\Phi_i$ plus a photon field $A_a$
 
-The Euler-Lagrange equation:
+Write
 
-$$\partial_t^2 \mu = N^2 \partial_x^2 \mu + \frac{N'}{N}(\partial_t \mu)^2 + N N'(\partial_x \mu)^2 - N^2 V'(\mu) + N^2 J$$
+$$N(\mu) = \epsilon + (1-\epsilon)\tanh(\alpha \mu), \qquad Z(\mu) = N(\mu)^{-2}.$$
 
-Here $J$ is the reduced static screened source, not the raw dynamical activity density $R$.
+Then the mainline action is
+
+$$
+S = \int d^4x \sqrt{-g}\left[
+\frac{R[g]}{16\pi G}
+- \frac12 \nabla_a\mu \nabla^a\mu
+- \frac12 m_\mu^2 \mu^2
++ J\mu
++ \lambda (u_a u^a + 1)
+\right]
++ \sum_i S_i[\Phi_i; g,\mu]
++ S_\gamma[A;g],
+$$
+
+with
+
+$$
+S_i = -\frac12 \int d^4x \sqrt{-g}\left[
+ g^{ab}\nabla_a\Phi_i\nabla_b\Phi_i
++ Z(\mu)\,m_i^2 \Phi_i^2
+\right],
+$$
+
+and
+
+$$
+S_\gamma[A;g] = -\frac14 \int d^4x \sqrt{-g}\,F_{ab}F^{ab}.
+$$
+
+This is the strict mainline reading of the repository:
+
+- the massive sector couples through the mass term, with effective potential $m_i^2/N(\mu)^2$
+- photons propagate on the metric $g_{ab}$ itself
+- lensing and redshift therefore come from the same metric once the Einstein equations are solved
+
+The source is the reduced static screened scalar
+
+$$
+J = \eta_J \frac{\tau_p}{L_\perp^2} R, \qquad
+R = \sum_i n_i\,\gamma_{D,i},
+$$
+
+with $R$, $\tau_p$, and $L_\perp$ treated as scalar fields in the local preferred rest frame.
+
+Within the current static Einstein workbench, one further scaling fact is exact. For fixed source-shape parameters, the screened field equation is linear in the source amplitude, so $\mu \propto \texttt{source\_amplitude}$. The scalar stress tensor is quadratic in $\mu$ and $\partial\mu$, so
+
+$$
+T^{(\mu)}_{ab} \propto \texttt{density\_scale}\,\texttt{source\_amplitude}^2.
+$$
+
+The backreacted photon metric therefore depends on the current scaffold only through the composite scale
+
+$$
+S_{\mathrm{eff}} = \texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2
+$$
+
+once the geometric shape parameters are held fixed. That exact scaling is now confirmed numerically in the HFF comparison workbench as well.
+
+The corresponding field equations are:
+
+$$
+G_{ab} = 8\pi G\left(T^{(\mu)}_{ab} + T^{(u)}_{ab} + \sum_i T^{(i)}_{ab} + T^{(\gamma)}_{ab}\right),
+$$
+
+$$
+\Box\mu - m_\mu^2 \mu + \frac{\partial \mathcal{L}_{\mathrm{massive}}}{\partial \mu} + J = 0,
+$$
+
+$$
+\nabla_b F^{ab} = 0,
+$$
+
+together with the unit constraint $u_a u^a = -1$ and the matter Euler-Lagrange equations from $S_i$. Because the full action is diffeomorphism invariant, the total stress tensor is covariantly conserved:
+
+$$
+\nabla^a\left(T^{(\mu)}_{ab} + T^{(u)}_{ab} + \sum_i T^{(i)}_{ab} + T^{(\gamma)}_{ab}\right) = 0.
+$$
+
+That closes the formal story that the workbenches are using: the photon observable is not guessed independently of the massive-sector branch; it is derived from the same metric that solves the sourced Einstein system.
 
 **Propagation speed of $\mu$:** $c_\mu = N(\mu)$. In metered regions ($\mu \gg 1$), $c_\mu \to 1$. In unmetered regions ($\mu \to 0$), $c_\mu \to 0$. The metering density obeys the same causal structure as matter. Horizons are self-reinforcing: once $N = 0$, no $\mu$ dynamics can penetrate.
 
 ### Steady State
 
-In the static limit with the free massive potential $V(\mu) = m^2 \mu^2 / 2$:
+In the static preferred-frame reduction with the free massive potential $V(\mu) = m^2 \mu^2 / 2$:
 
 $$-\nabla^2 \mu + m^2 \mu = J(x)$$
 
-This is the screened Poisson equation. The screening length $\ell_s = 1/m$ determines how far metering influence extends beyond the source.
+This is the screened Poisson equation. The screening length $\ell_s = 1/m$ determines how far metering influence extends beyond the source. In the same static frame, the active massive-sector dispersion law reduces to
+
+$$
+\omega^2 = k^2 + m_i^2 Z(\mu),
+$$
+
+so finite-energy turning occurs at
+
+$$
+N(\mu) = \frac{m_i}{E}.
+$$
+
+Above threshold, the current workbench uses the corresponding group velocity
+
+$$
+v_i(N,E) = \sqrt{1 - \left(\frac{m_i}{E\,N}\right)^2},
+$$
+
+and for a uniform-lapse segment of physical length $L$ the crossing-time excess is
+
+$$
+\Delta t_i(L,N,E) = \frac{L}{c}\left(\frac{1}{v_i(N,E)} - 1\right).
+$$
+
+That is the same threshold-and-delay structure used in the current massive-sector and epsilon-regularization calculations.
 
 ### Computational Results
 
@@ -427,6 +532,14 @@ Within the studied sweep, the transition is sharp rather than gradual: the torto
 Massive neutrinos ($m_\nu \sim 0.05$--$0.5$ eV) couple to the metering metric. Photons decouple and propagate at $c$. The excess delay for a massive particle traversing a void:
 
 $$\Delta t = \int_{\text{void}} \left(\frac{1}{N(x)} - 1\right) \frac{dx}{c}$$
+
+In the covariant mainline, the sharper statement is that species dependence enters through the turning condition
+
+$$
+N(\mu) = \frac{m_i}{E},
+$$
+
+so the hierarchy is controlled by the ratio $m_i/E$ rather than by an ad hoc particle label. Heavier or lower-energy massive modes freeze first, lighter or more energetic modes last.
 
 Selected predictions for a 120 Mpc void:
 
@@ -490,7 +603,17 @@ The alignment audit sharpens that picture further. Allowing a small rigid regist
 
 That changes the theoretical read again. The reduced 1+1 sign flip has still **not** been lifted into a raw 3+1D negative-$\kappa$ prediction of the viable branch. A sign-changing **residual** morphology can now arise within the Einstein-backreaction mainline not only in toy composites and first-pass HFF member geometries, but in a partially calibrated member-plus-envelope geometry that improves the direct archival comparison across both clusters and the 22-model family ensemble. What has **not** happened is a clean pixelwise lock, even after a rigid registration audit. So the immediate theory task is narrower now. It is no longer to ask whether multi-component geometry matters, and no longer simply to add a smooth background. It is to calibrate the viable Einstein branch beyond this first member-plus-envelope stage: amplitude laws, smooth-halo shape, line-of-sight structure, and other cluster-scale degrees of freedom, while also separating physical miscentering from purely comparative registration effects.
 
-The current local 22-family calibration search is now explicit. The best branch in [`theory_maps/hff-ensemble-calibration-search-summary.json`](./theory_maps/hff-ensemble-calibration-search-summary.json) and the full-resolution rerun in [`theory_maps/hff-ensemble-calibrated-member-envelope-summary.json`](./theory_maps/hff-ensemble-calibrated-member-envelope-summary.json) is a displaced member-plus-envelope Einstein model with `softened_nfw` source profile, smooth-envelope amplitude fraction `0.35`, size multiplier `5.0`, position shrink `0.75`, and a member-frame shift of `10 arcsec` along the principal axis. In the full-resolution 22-model summary, that branch reaches median resolved-sign agreement `0.498`, negative Jaccard `0.236`, harmonic `L2 = 0.157`, and member pass agreement `0.808`. Under rigid comparison alignment those medians move to `0.519`, `0.230`, `0.146`, and `0.85`, respectively, while pixel Pearson remains weak. So the viable branch is now materially calibrated, but it is still stronger on residual class and member-level ordering than on pixelwise field lock.
+The current local 22-family calibration search is now explicit. The first calibrated branch in [`theory_maps/hff-ensemble-calibration-search-summary.json`](./theory_maps/hff-ensemble-calibration-search-summary.json) and the full-resolution rerun in [`theory_maps/hff-ensemble-calibrated-member-envelope-summary.json`](./theory_maps/hff-ensemble-calibrated-member-envelope-summary.json) is a displaced member-plus-envelope Einstein model with `softened_nfw` source profile, smooth-envelope amplitude fraction `0.35`, size multiplier `5.0`, position shrink `0.75`, and a member-frame shift of `10 arcsec` along the principal axis. A subsequent exponent refinement in [`theory_maps/hff-exponent-refinement-summary.json`](./theory_maps/hff-exponent-refinement-summary.json) improves that branch further: the current best member law is amplitude-scaling exponent `0.75` with size-scaling exponent `0.6`. A further smooth-envelope refinement in [`theory_maps/hff-smooth-envelope-refinement-summary.json`](./theory_maps/hff-smooth-envelope-refinement-summary.json) then selects smooth-envelope amplitude fraction `0.25` and size multiplier `6.0` on top of that member law, while a follow-up line-of-sight refinement in [`theory_maps/hff-los-refinement-summary.json`](./theory_maps/hff-los-refinement-summary.json) still leaves `los_amplitude_fraction = 0` as the local winner. A direct smooth-halo offset test in [`theory_maps/hff-smooth-halo-parallel-shift-summary.json`](./theory_maps/hff-smooth-halo-parallel-shift-summary.json) and the higher-resolution check in [`theory_maps/hff-smooth-halo-parallel-shift-highres-comparison.json`](./theory_maps/hff-smooth-halo-parallel-shift-highres-comparison.json) then show that a simple global parallel shift of the smooth envelope is not the missing degree of freedom: the apparent low-resolution `-10 arcsec` improvement does not survive the higher-resolution rerun, and the zero-shift branch remains better.
+
+On the unaligned 22-model ensemble, that refined branch reaches median objective `1.2410`, median pixel Pearson `0.0154`, median pixel Spearman `0.1066`, median resolved-sign agreement `0.4828`, negative Jaccard `0.2862`, harmonic `L2 = 0.2391`, and member pass agreement `0.8919`. Under rigid comparison alignment, it reaches median objective `1.4168`, median pixel Pearson `0.0121`, median resolved-sign agreement `0.5047`, negative Jaccard `0.2921`, harmonic `L2 = 0.1677`, member-score Pearson `0.2989`, member-score Spearman `0.4055`, and member pass agreement `0.8717`. A direct global-strength sweep in [`theory_maps/hff-backreaction-scale-summary.json`](./theory_maps/hff-backreaction-scale-summary.json) then shows that the current reference normalization is already near the local optimum of the present scaffold: weakening or strengthening the overall Einstein backreaction does not open a cleaner field-level fit. More sharply still, the factorization audit in [`theory_maps/hff-backreaction-factorization-invariance.json`](./theory_maps/hff-backreaction-factorization-invariance.json) shows exact invariance of the 22-family comparison when the composite scale
+
+$$
+S_{\mathrm{eff}} = \texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2
+$$
+
+is held fixed. So within the current Einstein scaffold, the lensing calibration determines a composite backreaction scale, not the separate source amplitude and stress-energy normalizations.
+
+So the viable branch is now materially better calibrated than the first member-plus-envelope pass. The remaining gap is no longer that the model fails to produce the residual class, no longer that a simple line-of-sight add-on was never checked, no longer that a trivial smooth-halo miscentering was never tested, and no longer that a simple global rescale might rescue the fit. The remaining gap is a real field-level one: the current Einstein branch is now competitive on sign structure, overlap structure, and member-level ordering, but not yet on full pixelwise lock.
 
 **Observational target:** Galaxy cluster lensing residuals. The archival program tests whether the sign-flip-like morphology survives model-family variation and whether any decoherence-relevant proxy carries conditional signal beyond stellar mass and local convergence. That is a morphology-and-confounder program, not yet a completed derivation of a direct photon-sector effect.
 
@@ -558,6 +681,23 @@ then a Planck-tick occupancy bridge with $\tau_p = t_P$ gives two clean referenc
 
 That does not finish the covariant source theory, but it does move the bridge from an impossible suppression problem to a narrow and structurally specific occupancy family.
 
+The lensing side now sharpens what that bridge can and cannot fix. Within the current Einstein-backreaction scaffold, the 22-family HFF comparison is exactly invariant across the tested refactorings
+
+$$
+(\texttt{source\_amplitude}, \texttt{density\_scale}) =
+(5\times 10^{-4}, 4\times 10^{-6}),
+(10^{-3}, 10^{-6}),
+(2\times 10^{-3}, 2.5\times 10^{-7}),
+$$
+
+all at fixed
+
+$$
+S_{\mathrm{eff}} = \texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2 = 10^{-12}.
+$$
+
+So the present lensing branch does not separately determine the source amplitude and stress-energy normalization. It fixes only the composite backreaction scale until the covariant source law is closed.
+
 So this remains the shortest current path to a hard physical bound, but it is no longer vague. The next laboratory move is a purpose-built active-vs-inert Casimir differential with `O(10 uPa)` pressure reach and `O(10 pN)` force reach near `0.2 um`, together with wider-gap follow-up runs where the exact screened-slab law predicts a slower falloff than the raw `1/a^4` benchmark guess, and a covariant fixation of the occupancy bridge parameters $(\eta_J, \tau_p, L_\perp)$ that turns the current bridge family into a true physical prediction.
 
 ### C. Cosmological Metering Signature
@@ -609,7 +749,7 @@ $$\zeta_{\max} \sim \frac{2\,\delta c_{\max}}{\tanh^2(\alpha_\gamma \mu_\infty)}
 
 with $\delta c_{\max} \sim 3 \times 10^{-15}$. Even a tiny background such as $\mu_\infty = 10^{-3}$ drives the allowed temporal coupling down to order `6e-9`.
 
-The Einstein-backreaction branch is in better shape. In the exterior it is a GR-derived branch and relaxes toward Schwarzschild with $\gamma = 1$. That makes it the current mainline candidate. The new theory result is now six-stage. In spherical cluster-style maps, the branch remains convergence-dominated and does not produce a resolved raw sign-flip morphology. In toy multi-component composite maps with the same `radial_median_bandpass` style residual used observationally, the branch does produce robust anisotropic sign-changing residual structure while keeping the raw convergence map nonnegative. In a first real-member calibration built from the hardened HFF member tables, that same residual behavior appears in both `Abell 370` and `RXC J2248 / Abell S1063`. In the next direct archive-vs-theory step, a broad smooth envelope built from the same member geometry improves the structural comparison on the full 22-model ensemble: median resolved-sign agreement reaches `\approx 0.497`, median negative-residual overlap reaches `\approx 0.258`, median member-score Spearman reaches `\approx 0.165`, and median member pass-agreement reaches `\approx 0.658`. A subsequent rigid-alignment audit improves those structural and member-level comparisons further, especially the member-score ranking, but still leaves the field-level Pearson correlation near zero. So the immediate theoretical task has changed again. It is no longer to invent a photon channel, and no longer merely to ask whether multi-component geometry matters. It is to calibrate the viable Einstein branch beyond the first member-plus-envelope stage until the direct residual-map comparison is quantitatively competitive in the actual field, not only in sign structure and member-level rankings.
+The Einstein-backreaction branch is in better shape. In the exterior it is a GR-derived branch and relaxes toward Schwarzschild with $\gamma = 1$. That makes it the current mainline candidate. The current theory result is now twelve-stage. In spherical cluster-style maps, the branch remains convergence-dominated and does not produce a resolved raw sign-flip morphology. In toy multi-component composite maps with the same `radial_median_bandpass` style residual used observationally, the branch does produce robust anisotropic sign-changing residual structure while keeping the raw convergence map nonnegative. In a first real-member calibration built from the hardened HFF member tables, that same residual behavior appears in both `Abell 370` and `RXC J2248 / Abell S1063`. A broad smooth envelope then improves the structural comparison on the full 22-model ensemble. A rigid-alignment audit strengthens the member-level ranking and overlap measures further. A member-law refinement then selects amplitude exponent `0.75` and size exponent `0.6`. A subsequent smooth-envelope refinement then selects amplitude fraction `0.25` and size multiplier `6.0`. A direct line-of-sight refinement still leaves the no-LOS branch as the local winner. A direct smooth-halo parallel-shift test then leaves the zero-shift branch as the honest winner at higher resolution. A global-strength sweep leaves the current reference normalization near the local optimum. And a factorization audit shows that the present lensing comparison fixes only the composite scale $\texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2$, not the source and stress-energy normalizations separately. The remaining gap is therefore sharply identified: the viable Einstein branch now carries the right residual class and a materially improved quantitative structure, but the direct residual-map comparison is still not competitive enough at the full field level.
 
 ### The Coupling Constant
 
@@ -695,8 +835,8 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Potential shape discrimination | 6-site hardware comparison complete; $1/N^2$ gives the best fit among tested shapes |
 | Metering field equation (PDE + stability) | Numerical study complete; stable in the tested setups |
 | Photon decoupling | Model consequence of the mass-term-only coupling |
-| 3+1D lensing observable | Flat control, Einstein-backreaction branch, and explicit photon-sector branch are computable; the direct photon branch is heavily constrained; the Einstein branch is the current mainline candidate; spherical cluster-style maps remain convergence-dominated; multi-component, HFF-member, and calibrated displaced member-plus-envelope Einstein maps generate sign-changing residual morphology without raw negative convergence; the current 22-family calibration improves sign-structure and member-level agreement, and the rigid-alignment audit shows part of the remaining gap is registration-sensitive, but pixelwise field matching remains weak |
-| Decoherence rate source criterion | Dynamic activity density $R = \sum n_i \gamma_{D,i}$ adopted; exact slab work now identifies a first viable occupancy bridge family to the static source $J$; not yet fixed covariantly or observationally established |
+| 3+1D lensing observable | Flat control, Einstein-backreaction branch, and explicit photon-sector branch are computable; the direct photon branch is heavily constrained; the Einstein branch is the current mainline candidate; spherical cluster-style maps remain convergence-dominated; multi-component, HFF-member, and calibrated displaced member-plus-envelope Einstein maps generate sign-changing residual morphology without raw negative convergence; member-law and smooth-envelope refinements materially improve the 22-family comparison; direct line-of-sight and simple smooth-halo offset refinements do not rescue the field-level gap; pixelwise field matching remains weak |
+| Decoherence rate source criterion | Dynamic activity density $R = \sum n_i \gamma_{D,i}$ adopted; exact slab work now identifies a first viable occupancy bridge family to the static source $J$; the current Einstein lensing scaffold fixes only the composite backreaction scale $\texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2$ and therefore does not yet determine the bridge parameters separately |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
 | Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; the public-data proxy lane is exhausted without a replicated abundance-style signal; active focus shifts to the 3+1D lensing derivation |
 | Coq formalization | Initial abstract theorem development complete; monolithic file compiles |

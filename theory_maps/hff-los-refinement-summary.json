@@ -1,0 +1,60 @@
+{
+  "rows": [
+    {
+      "los_amplitude_fraction": 0.0,
+      "n_models": 22,
+      "median_objective": 1.2268895854347834,
+      "median_pixel_pearson": 0.023034215256074006,
+      "median_pixel_spearman": 0.16421085474996455,
+      "median_resolved_sign_agreement": 0.48176152710678033,
+      "median_positive_jaccard": 0.18329682660765573,
+      "median_negative_jaccard": 0.2928693117846016,
+      "median_harmonic_l2": 0.2543469048799486,
+      "median_member_score_pearson": 0.006984182121305326,
+      "median_member_score_spearman": 0.16959423289518955,
+      "median_member_pass_agreement": 0.918918918918919
+    },
+    {
+      "los_amplitude_fraction": 0.05,
+      "n_models": 22,
+      "median_objective": 1.2209555361675402,
+      "median_pixel_pearson": 0.023097716833761696,
+      "median_pixel_spearman": 0.16712893293769274,
+      "median_resolved_sign_agreement": 0.48300450565246245,
+      "median_positive_jaccard": 0.18311550515666042,
+      "median_negative_jaccard": 0.29142394162272667,
+      "median_harmonic_l2": 0.2550268010607435,
+      "median_member_score_pearson": 0.0030860873169933226,
+      "median_member_score_spearman": 0.1632520697168658,
+      "median_member_pass_agreement": 0.918918918918919
+    },
+    {
+      "los_amplitude_fraction": 0.1,
+      "n_models": 22,
+      "median_objective": 1.2033149078342877,
+      "median_pixel_pearson": 0.025572086121383206,
+      "median_pixel_spearman": 0.16995104542872572,
+      "median_resolved_sign_agreement": 0.4841547432804427,
+      "median_positive_jaccard": 0.18353007096302856,
+      "median_negative_jaccard": 0.29052557066291584,
+      "median_harmonic_l2": 0.2574312389092478,
+      "median_member_score_pearson": -0.004097308307501884,
+      "median_member_score_spearman": 0.1619535335225955,
+      "median_member_pass_agreement": 0.8918918918918919
+    }
+  ],
+  "best_row": {
+    "los_amplitude_fraction": 0.0,
+    "n_models": 22,
+    "median_objective": 1.2268895854347834,
+    "median_pixel_pearson": 0.023034215256074006,
+    "median_pixel_spearman": 0.16421085474996455,
+    "median_resolved_sign_agreement": 0.48176152710678033,
+    "median_positive_jaccard": 0.18329682660765573,
+    "median_negative_jaccard": 0.2928693117846016,
+    "median_harmonic_l2": 0.2543469048799486,
+    "median_member_score_pearson": 0.006984182121305326,
+    "median_member_score_spearman": 0.16959423289518955,
+    "median_member_pass_agreement": 0.918918918918919
+  }
+}

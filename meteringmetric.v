@@ -52,6 +52,10 @@ Definition proper_time_static (f : R -> R) (mu : R -> R)
   (x : R) (T : R) : R :=
   lapse f mu x * T.
 
+Definition proper_time_density_path (f : R -> R) (mu : R -> R)
+  (gamma v : R -> R) (t : R) : R :=
+  sqrt ((lapse f mu (gamma t))^2 - (v t)^2).
+
 Definition tortoise (N : R -> R) (L : R) : R :=
   RInt (fun x => / N x) 0 L.
 
@@ -260,10 +264,48 @@ Proof.
   apply proper_time_zero_interval.
 Qed.
 
+Theorem proper_time_zero_interval_admissible_path :
+  forall (f : R -> R) (mu gamma v : R -> R) (t1 t2 : R),
+  f 0 = 0 ->
+  t1 <= t2 ->
+  (forall t, t1 <= t <= t2 -> mu (gamma t) = 0) ->
+  (forall t, t1 <= t <= t2 -> 0 <= v t <= lapse f mu (gamma t)) ->
+  RInt (fun t => proper_time_density_path f mu gamma v t) t1 t2 = 0.
+Proof.
+  intros f mu gamma v t1 t2 Hf0 Hle Hzero Hadm.
+  transitivity (RInt (fun _ : R => 0) t1 t2).
+  - apply RInt_ext.
+    intros x Hx.
+    assert (Hmin : Rmin t1 t2 = t1) by (apply Rmin_left; exact Hle).
+    assert (Hmax : Rmax t1 t2 = t2) by (apply Rmax_right; exact Hle).
+    rewrite Hmin, Hmax in Hx.
+    assert (Hmu0 : mu (gamma x) = 0).
+    { apply Hzero. lra. }
+    assert (Hlap0 : lapse f mu (gamma x) = 0).
+    { unfold lapse. rewrite Hmu0, Hf0. reflexivity. }
+    assert (Hv0 : v x = 0).
+    {
+      assert (Hvx : 0 <= v x <= lapse f mu (gamma x)).
+      { apply Hadm. lra. }
+      rewrite Hlap0 in Hvx.
+      lra.
+    }
+    unfold proper_time_density_path.
+    rewrite Hlap0.
+    rewrite Hv0.
+    replace (0 ^ 2 - 0 ^ 2) with 0 by ring.
+    rewrite sqrt_0.
+    reflexivity.
+  - rewrite RInt_const.
+    unfold scal; simpl.
+    unfold mult; simpl.
+    lra.
+Qed.
+
 (**
   Scope note: the proper-time theorem family here treats static observers and
-  prescribed paths supported entirely in meterless regions. It does not yet
-  formalize dynamically solved general worldlines.
+  admissible prescribed paths supported entirely in meterless regions. It
+  does not yet formalize dynamically solved general worldlines.
 *)
 
 Lemma proper_time_bounded :

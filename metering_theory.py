@@ -49,8 +49,52 @@ def gaussian_metering_density(grid: np.ndarray, mu0: float, sigma: float) -> np.
     return mu0 * np.exp(-(grid * grid) / (2.0 * sigma * sigma))
 
 
+def activity_density_scalar(number_density: float | np.ndarray, decoherence_rate: float | np.ndarray) -> float | np.ndarray:
+    return np.asarray(number_density) * np.asarray(decoherence_rate)
+
+
 def occupancy_bridge_conversion(eta_j: float, tau_p_s: float, l_perp_m: float) -> float:
     return OccupancyBridge(eta_j=eta_j, tau_p_s=tau_p_s, l_perp_m=l_perp_m).conversion_factor()
+
+
+def bridge_efficiency_for_conversion(required_conversion: float, tau_p_s: float, l_perp_m: float) -> float:
+    if required_conversion <= 0.0:
+        raise ValueError("required_conversion must be positive.")
+    if tau_p_s <= 0.0:
+        raise ValueError("tau_p_s must be positive.")
+    if l_perp_m <= 0.0:
+        raise ValueError("l_perp_m must be positive.")
+    return float(required_conversion * (l_perp_m * l_perp_m) / tau_p_s)
+
+
+def bridge_transverse_scale_for_conversion(required_conversion: float, eta_j: float, tau_p_s: float) -> float:
+    if required_conversion <= 0.0:
+        raise ValueError("required_conversion must be positive.")
+    if eta_j <= 0.0:
+        raise ValueError("eta_j must be positive.")
+    if tau_p_s <= 0.0:
+        raise ValueError("tau_p_s must be positive.")
+    return float(math.sqrt(eta_j * tau_p_s / required_conversion))
+
+
+def bridge_persistence_for_conversion(required_conversion: float, eta_j: float, l_perp_m: float) -> float:
+    if required_conversion <= 0.0:
+        raise ValueError("required_conversion must be positive.")
+    if eta_j <= 0.0:
+        raise ValueError("eta_j must be positive.")
+    if l_perp_m <= 0.0:
+        raise ValueError("l_perp_m must be positive.")
+    return float(required_conversion * (l_perp_m * l_perp_m) / eta_j)
+
+
+def effective_backreaction_scale(source_amplitude: float, density_scale: float, gravity_scale: float) -> float:
+    if source_amplitude <= 0.0:
+        raise ValueError("source_amplitude must be positive.")
+    if density_scale <= 0.0:
+        raise ValueError("density_scale must be positive.")
+    if gravity_scale <= 0.0:
+        raise ValueError("gravity_scale must be positive.")
+    return float(gravity_scale * density_scale * source_amplitude * source_amplitude)
 
 
 def static_source_from_activity(activity_density: float | np.ndarray, bridge: OccupancyBridge) -> float | np.ndarray:

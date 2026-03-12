@@ -213,6 +213,8 @@ def build_theory_component_specs(
     smooth_background_size_multiplier: float,
     smooth_background_minimum_size_scale: float,
     smooth_background_position_shrink: float,
+    smooth_background_shift_parallel_arcsec: float,
+    smooth_background_shift_perpendicular_arcsec: float,
     los_amplitude_fraction: float,
     los_size_multiplier: float,
     los_minimum_size_scale: float,
@@ -231,14 +233,19 @@ def build_theory_component_specs(
         shift_x_arcsec=member_shift_x,
         shift_y_arcsec=member_shift_y,
     )
+    smooth_background_shift_x, smooth_background_shift_y = axis_shift_components(
+        shift_parallel_arcsec=smooth_background_shift_parallel_arcsec,
+        shift_perpendicular_arcsec=smooth_background_shift_perpendicular_arcsec,
+        principal_axis_deg=principal_axis_deg,
+    )
     smooth_background_specs = build_shifted_background_component_specs(
         component_specs=shifted_member_specs,
         amplitude_fraction=smooth_background_amplitude_fraction,
         size_multiplier=smooth_background_size_multiplier,
         minimum_size_scale=smooth_background_minimum_size_scale,
         position_shrink=smooth_background_position_shrink,
-        shift_x_arcsec=0.0,
-        shift_y_arcsec=0.0,
+        shift_x_arcsec=smooth_background_shift_x,
+        shift_y_arcsec=smooth_background_shift_y,
         layer_name="smooth_background",
     )
     los_shift_x, los_shift_y = axis_shift_components(
@@ -260,6 +267,8 @@ def build_theory_component_specs(
         "principal_axis_deg": float(principal_axis_deg),
         "member_shift_x_arcsec": float(member_shift_x),
         "member_shift_y_arcsec": float(member_shift_y),
+        "smooth_background_shift_x_arcsec": float(smooth_background_shift_x),
+        "smooth_background_shift_y_arcsec": float(smooth_background_shift_y),
         "line_of_sight_shift_x_arcsec": float(los_shift_x),
         "line_of_sight_shift_y_arcsec": float(los_shift_y),
         "member_component_count": int(len(shifted_member_specs)),
@@ -453,6 +462,8 @@ def execute_search(
                 smooth_background_size_multiplier=float(combo["smooth_background_size_multiplier"]),
                 smooth_background_minimum_size_scale=float(combo["smooth_background_minimum_size_scale"]),
                 smooth_background_position_shrink=float(combo["smooth_background_position_shrink"]),
+                smooth_background_shift_parallel_arcsec=0.0,
+                smooth_background_shift_perpendicular_arcsec=0.0,
                 los_amplitude_fraction=0.0,
                 los_size_multiplier=float(combo["los_size_multiplier"]),
                 los_minimum_size_scale=float(combo["los_minimum_size_scale"]),
@@ -528,6 +539,8 @@ def execute_search(
                     smooth_background_size_multiplier=float(parameters["smooth_background_size_multiplier"]),
                     smooth_background_minimum_size_scale=float(parameters["smooth_background_minimum_size_scale"]),
                     smooth_background_position_shrink=float(parameters["smooth_background_position_shrink"]),
+                    smooth_background_shift_parallel_arcsec=float(parameters["smooth_background_shift_parallel_arcsec"]),
+                    smooth_background_shift_perpendicular_arcsec=float(parameters["smooth_background_shift_perpendicular_arcsec"]),
                     los_amplitude_fraction=float(parameters["los_amplitude_fraction"]),
                     los_size_multiplier=float(parameters["los_size_multiplier"]),
                     los_minimum_size_scale=float(parameters["los_minimum_size_scale"]),
@@ -616,6 +629,8 @@ def final_evaluation(
             smooth_background_size_multiplier=float(best_parameters["smooth_background_size_multiplier"]),
             smooth_background_minimum_size_scale=float(best_parameters["smooth_background_minimum_size_scale"]),
             smooth_background_position_shrink=float(best_parameters["smooth_background_position_shrink"]),
+            smooth_background_shift_parallel_arcsec=float(best_parameters["smooth_background_shift_parallel_arcsec"]),
+            smooth_background_shift_perpendicular_arcsec=float(best_parameters["smooth_background_shift_perpendicular_arcsec"]),
             los_amplitude_fraction=float(best_parameters["los_amplitude_fraction"]),
             los_size_multiplier=float(best_parameters["los_size_multiplier"]),
             los_minimum_size_scale=float(best_parameters["los_minimum_size_scale"]),
@@ -685,6 +700,8 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
         for value in [
             *args.member_shift_parallel_arcsec_values,
             *args.member_shift_perpendicular_arcsec_values,
+            *args.smooth_background_shift_parallel_arcsec_values,
+            *args.smooth_background_shift_perpendicular_arcsec_values,
             *args.los_shift_parallel_arcsec_values,
             *args.los_shift_perpendicular_arcsec_values,
             0.0,
@@ -701,8 +718,8 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             member_flag_key=args.member_flag_key,
             ra_key=args.ra_key,
             dec_key=args.dec_key,
-            amplitude_scaling_exponent=1.0,
-            size_scaling_exponent=0.5,
+            amplitude_scaling_exponent=args.amplitude_scaling_exponent,
+            size_scaling_exponent=args.size_scaling_exponent,
             minimum_size_scale=args.minimum_size_scale,
             auto_extent_padding_arcsec=args.auto_extent_padding_arcsec,
             minimum_extent_arcsec=args.minimum_extent_arcsec,
@@ -722,8 +739,8 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             member_flag_key=args.member_flag_key,
             ra_key=args.ra_key,
             dec_key=args.dec_key,
-            amplitude_scaling_exponent=1.0,
-            size_scaling_exponent=0.5,
+            amplitude_scaling_exponent=args.amplitude_scaling_exponent,
+            size_scaling_exponent=args.size_scaling_exponent,
             minimum_size_scale=args.minimum_size_scale,
             auto_extent_padding_arcsec=args.auto_extent_padding_arcsec,
             minimum_extent_arcsec=args.minimum_extent_arcsec,
@@ -774,6 +791,8 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
         stage_b_space={
             "member_shift_parallel_arcsec": args.member_shift_parallel_arcsec_values,
             "member_shift_perpendicular_arcsec": args.member_shift_perpendicular_arcsec_values,
+            "smooth_background_shift_parallel_arcsec": args.smooth_background_shift_parallel_arcsec_values,
+            "smooth_background_shift_perpendicular_arcsec": args.smooth_background_shift_perpendicular_arcsec_values,
             "los_amplitude_fraction": args.los_amplitude_fraction_values,
             "los_size_multiplier": args.los_size_multiplier_values,
             "los_minimum_size_scale": [args.los_minimum_size_scale],
@@ -794,8 +813,8 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             member_flag_key=args.member_flag_key,
             ra_key=args.ra_key,
             dec_key=args.dec_key,
-            amplitude_scaling_exponent=1.0,
-            size_scaling_exponent=0.5,
+            amplitude_scaling_exponent=args.amplitude_scaling_exponent,
+            size_scaling_exponent=args.size_scaling_exponent,
             minimum_size_scale=args.minimum_size_scale,
             auto_extent_padding_arcsec=args.auto_extent_padding_arcsec,
             minimum_extent_arcsec=args.minimum_extent_arcsec,
@@ -815,8 +834,8 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             member_flag_key=args.member_flag_key,
             ra_key=args.ra_key,
             dec_key=args.dec_key,
-            amplitude_scaling_exponent=1.0,
-            size_scaling_exponent=0.5,
+            amplitude_scaling_exponent=args.amplitude_scaling_exponent,
+            size_scaling_exponent=args.size_scaling_exponent,
             minimum_size_scale=args.minimum_size_scale,
             auto_extent_padding_arcsec=args.auto_extent_padding_arcsec,
             minimum_extent_arcsec=args.minimum_extent_arcsec,
@@ -867,6 +886,13 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "rxcj2248_member_table": args.rxcj2248_member_table,
             "rxcj2248_kappa_dir": args.rxcj2248_kappa_dir,
             "top_members": args.top_members,
+            "amplitude_scaling_exponent": args.amplitude_scaling_exponent,
+            "size_scaling_exponent": args.size_scaling_exponent,
+            "source_amplitude": args.source_amplitude,
+            "density_scale": args.density_scale,
+            "gravity_scale": args.gravity_scale,
+            "smooth_background_shift_parallel_arcsec_values": args.smooth_background_shift_parallel_arcsec_values,
+            "smooth_background_shift_perpendicular_arcsec_values": args.smooth_background_shift_perpendicular_arcsec_values,
             "residual_mode": args.residual_mode,
             "search_grid_size": args.search_grid_size,
             "final_grid_size": args.final_grid_size,
@@ -908,6 +934,8 @@ def build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument("--member-flag-key", default="is_cluster_member")
     calibrate.add_argument("--ra-key", default="ra")
     calibrate.add_argument("--dec-key", default="dec")
+    calibrate.add_argument("--amplitude-scaling-exponent", type=float, default=1.0)
+    calibrate.add_argument("--size-scaling-exponent", type=float, default=0.5)
     calibrate.add_argument("--minimum-size-scale", type=float, default=0.2)
     calibrate.add_argument("--source-amplitude", type=float, default=1.0e-3)
     calibrate.add_argument("--source-sigma", type=float, default=120.0)
@@ -942,6 +970,8 @@ def build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument("--smooth-background-amplitude-fraction-values", nargs="+", type=float, default=[0.25, 0.35, 0.45])
     calibrate.add_argument("--smooth-background-size-multiplier-values", nargs="+", type=float, default=[4.0, 5.0, 6.0])
     calibrate.add_argument("--smooth-background-position-shrink-values", nargs="+", type=float, default=[0.6, 0.75, 0.9])
+    calibrate.add_argument("--smooth-background-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--smooth-background-shift-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--smooth-background-minimum-size-scale", type=float, default=1.0)
     calibrate.add_argument("--member-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0, 10.0, -10.0])
     calibrate.add_argument("--member-shift-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])

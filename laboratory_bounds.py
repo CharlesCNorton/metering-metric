@@ -26,7 +26,12 @@ from pathlib import Path
 from typing import Iterable
 
 import numpy as np
-from metering_theory import PLANCK_TIME
+from metering_theory import (
+    PLANCK_TIME,
+    bridge_efficiency_for_conversion,
+    bridge_persistence_for_conversion,
+    bridge_transverse_scale_for_conversion,
+)
 
 
 HBAR = 1.054_571_817e-34
@@ -778,7 +783,11 @@ def build_source_bridge_report(
     required_conversion = float(normalization_gap["effective_conversion_factor"])
     candidate_length_rows = []
     for length_m in candidate_lengths_m:
-        required_tau = required_conversion * length_m * length_m
+        required_tau = bridge_persistence_for_conversion(
+            required_conversion=required_conversion,
+            eta_j=1.0,
+            l_perp_m=length_m,
+        )
         candidate_length_rows.append(
             {
                 "transverse_scale_m": float(length_m),
@@ -790,7 +799,11 @@ def build_source_bridge_report(
 
     candidate_time_rows = []
     for time_s in candidate_times_s:
-        required_efficiency = required_conversion * screening_length_m * screening_length_m / time_s
+        required_efficiency = bridge_efficiency_for_conversion(
+            required_conversion=required_conversion,
+            tau_p_s=time_s,
+            l_perp_m=screening_length_m,
+        )
         candidate_time_rows.append(
             {
                 "persistence_time_s": float(time_s),
@@ -799,8 +812,16 @@ def build_source_bridge_report(
             }
         )
 
-    planck_tick_efficiency = required_conversion * screening_length_m * screening_length_m / PLANCK_TIME
-    planck_tick_length_for_unit_efficiency = math.sqrt(PLANCK_TIME / required_conversion)
+    planck_tick_efficiency = bridge_efficiency_for_conversion(
+        required_conversion=required_conversion,
+        tau_p_s=PLANCK_TIME,
+        l_perp_m=screening_length_m,
+    )
+    planck_tick_length_for_unit_efficiency = bridge_transverse_scale_for_conversion(
+        required_conversion=required_conversion,
+        eta_j=1.0,
+        tau_p_s=PLANCK_TIME,
+    )
     screening_length_row = min(candidate_length_rows, key=lambda row: abs(row["transverse_scale_m"] - screening_length_m))
     nearest_unit_efficiency_length_row = min(
         candidate_length_rows,
