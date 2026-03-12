@@ -10,6 +10,7 @@ from typing import Iterable
 
 import numpy as np
 
+from metering_theory import bridge_matched_source_amplitude, static_source_amplitude_from_activity
 from three_plus_one_lensing import (
     build_archival_residual_map_on_member_grid,
     build_einstein_component_payloads,
@@ -55,6 +56,78 @@ def axis_shift_components(
     return float(shift_x), float(shift_y)
 
 
+def axis_coordinates(x_arcsec: float, y_arcsec: float, principal_axis_deg: float) -> tuple[float, float]:
+    angle = math.radians(principal_axis_deg)
+    cos_angle = math.cos(angle)
+    sin_angle = math.sin(angle)
+    parallel = x_arcsec * cos_angle + y_arcsec * sin_angle
+    perpendicular = -x_arcsec * sin_angle + y_arcsec * cos_angle
+    return float(parallel), float(perpendicular)
+
+
+def from_axis_coordinates(parallel_arcsec: float, perpendicular_arcsec: float, principal_axis_deg: float) -> tuple[float, float]:
+    angle = math.radians(principal_axis_deg)
+    cos_angle = math.cos(angle)
+    sin_angle = math.sin(angle)
+    x_arcsec = parallel_arcsec * cos_angle - perpendicular_arcsec * sin_angle
+    y_arcsec = parallel_arcsec * sin_angle + perpendicular_arcsec * cos_angle
+    return float(x_arcsec), float(y_arcsec)
+
+
+def anisotropically_shrink_component_specs(
+    component_specs: list[dict],
+    principal_axis_deg: float,
+    shrink_parallel: float,
+    shrink_perpendicular: float,
+) -> list[dict]:
+    clamped_parallel = min(max(shrink_parallel, 0.0), 1.0)
+    clamped_perpendicular = min(max(shrink_perpendicular, 0.0), 1.0)
+    transformed = []
+    for spec in component_specs:
+        parallel, perpendicular = axis_coordinates(
+            x_arcsec=float(spec["center_x"]),
+            y_arcsec=float(spec["center_y"]),
+            principal_axis_deg=principal_axis_deg,
+        )
+        new_x, new_y = from_axis_coordinates(
+            parallel_arcsec=(1.0 - clamped_parallel) * parallel,
+            perpendicular_arcsec=(1.0 - clamped_perpendicular) * perpendicular,
+            principal_axis_deg=principal_axis_deg,
+        )
+        transformed.append(
+            {
+                **spec,
+                "center_x": new_x,
+                "center_y": new_y,
+            }
+        )
+    return transformed
+
+
+def split_axis_offsets(
+    principal_axis_deg: float,
+    split_parallel_arcsec: float,
+    split_perpendicular_arcsec: float,
+) -> list[tuple[float, float]]:
+    parallel_half = 0.5 * split_parallel_arcsec
+    perpendicular_half = 0.5 * split_perpendicular_arcsec
+    if abs(parallel_half) <= 1.0e-12 and abs(perpendicular_half) <= 1.0e-12:
+        return [(0.0, 0.0)]
+    parallels = [0.0] if abs(parallel_half) <= 1.0e-12 else [-parallel_half, parallel_half]
+    perpendiculars = [0.0] if abs(perpendicular_half) <= 1.0e-12 else [-perpendicular_half, perpendicular_half]
+    offsets = []
+    for parallel in parallels:
+        for perpendicular in perpendiculars:
+            offsets.append(
+                axis_shift_components(
+                    shift_parallel_arcsec=parallel,
+                    shift_perpendicular_arcsec=perpendicular,
+                    principal_axis_deg=principal_axis_deg,
+                )
+            )
+    return offsets
+
+
 def shift_component_specs(
     component_specs: list[dict],
     shift_x_arcsec: float,
@@ -76,21 +149,34 @@ def shift_component_specs(
 
 def build_shifted_background_component_specs(
     component_specs: list[dict],
+    principal_axis_deg: float,
     amplitude_fraction: float,
     size_multiplier: float,
     minimum_size_scale: float,
     position_shrink: float,
+    position_shrink_parallel: float | None,
+    position_shrink_perpendicular: float | None,
     shift_x_arcsec: float,
     shift_y_arcsec: float,
     layer_name: str,
 ) -> list[dict]:
+    isotropic_shrink = position_shrink
+    if position_shrink_parallel is not None or position_shrink_perpendicular is not None:
+        isotropic_shrink = 0.0
     specs = build_smoothed_background_component_specs(
         component_specs=component_specs,
         amplitude_fraction=amplitude_fraction,
         size_multiplier=size_multiplier,
         minimum_size_scale=minimum_size_scale,
-        position_shrink=position_shrink,
+        position_shrink=isotropic_shrink,
     )
+    if position_shrink_parallel is not None or position_shrink_perpendicular is not None:
+        specs = anisotropically_shrink_component_specs(
+            component_specs=specs,
+            principal_axis_deg=principal_axis_deg,
+            shrink_parallel=position_shrink if position_shrink_parallel is None else position_shrink_parallel,
+            shrink_perpendicular=position_shrink if position_shrink_perpendicular is None else position_shrink_perpendicular,
+        )
     shifted = []
     for spec in specs:
         shifted.append(
@@ -213,14 +299,21 @@ def build_theory_component_specs(
     smooth_background_size_multiplier: float,
     smooth_background_minimum_size_scale: float,
     smooth_background_position_shrink: float,
+    smooth_background_position_shrink_parallel: float | None,
+    smooth_background_position_shrink_perpendicular: float | None,
     smooth_background_shift_parallel_arcsec: float,
     smooth_background_shift_perpendicular_arcsec: float,
+    smooth_background_split_parallel_arcsec: float,
+    smooth_background_split_perpendicular_arcsec: float,
     los_amplitude_fraction: float,
     los_size_multiplier: float,
     los_minimum_size_scale: float,
     los_position_shrink: float,
+    los_position_shrink_parallel: float | None,
+    los_position_shrink_perpendicular: float | None,
     los_shift_parallel_arcsec: float,
     los_shift_perpendicular_arcsec: float,
+    los_split_parallel_arcsec: float,
 ) -> tuple[list[dict], dict[str, float]]:
     principal_axis_deg = component_principal_axis_deg(base_member_specs)
     member_shift_x, member_shift_y = axis_shift_components(
@@ -238,39 +331,84 @@ def build_theory_component_specs(
         shift_perpendicular_arcsec=smooth_background_shift_perpendicular_arcsec,
         principal_axis_deg=principal_axis_deg,
     )
-    smooth_background_specs = build_shifted_background_component_specs(
-        component_specs=shifted_member_specs,
-        amplitude_fraction=smooth_background_amplitude_fraction,
-        size_multiplier=smooth_background_size_multiplier,
-        minimum_size_scale=smooth_background_minimum_size_scale,
-        position_shrink=smooth_background_position_shrink,
-        shift_x_arcsec=smooth_background_shift_x,
-        shift_y_arcsec=smooth_background_shift_y,
-        layer_name="smooth_background",
+    smooth_background_offsets = split_axis_offsets(
+        principal_axis_deg=principal_axis_deg,
+        split_parallel_arcsec=smooth_background_split_parallel_arcsec,
+        split_perpendicular_arcsec=smooth_background_split_perpendicular_arcsec,
     )
+    smooth_weight = 1.0 / max(len(smooth_background_offsets), 1)
+    smooth_background_specs = []
+    for split_x, split_y in smooth_background_offsets:
+        smooth_background_specs.extend(
+            build_shifted_background_component_specs(
+                component_specs=shifted_member_specs,
+                principal_axis_deg=principal_axis_deg,
+                amplitude_fraction=smooth_weight * smooth_background_amplitude_fraction,
+                size_multiplier=smooth_background_size_multiplier,
+                minimum_size_scale=smooth_background_minimum_size_scale,
+                position_shrink=smooth_background_position_shrink,
+                position_shrink_parallel=smooth_background_position_shrink_parallel,
+                position_shrink_perpendicular=smooth_background_position_shrink_perpendicular,
+                shift_x_arcsec=smooth_background_shift_x + split_x,
+                shift_y_arcsec=smooth_background_shift_y + split_y,
+                layer_name="smooth_background",
+            )
+        )
     los_shift_x, los_shift_y = axis_shift_components(
         shift_parallel_arcsec=los_shift_parallel_arcsec,
         shift_perpendicular_arcsec=los_shift_perpendicular_arcsec,
         principal_axis_deg=principal_axis_deg,
     )
-    los_specs = build_shifted_background_component_specs(
-        component_specs=shifted_member_specs,
-        amplitude_fraction=los_amplitude_fraction,
-        size_multiplier=los_size_multiplier,
-        minimum_size_scale=los_minimum_size_scale,
-        position_shrink=los_position_shrink,
-        shift_x_arcsec=los_shift_x,
-        shift_y_arcsec=los_shift_y,
-        layer_name="line_of_sight",
+    los_offsets = split_axis_offsets(
+        principal_axis_deg=principal_axis_deg,
+        split_parallel_arcsec=los_split_parallel_arcsec,
+        split_perpendicular_arcsec=0.0,
     )
+    los_weight = 1.0 / max(len(los_offsets), 1)
+    los_specs = []
+    for split_x, split_y in los_offsets:
+        los_specs.extend(
+            build_shifted_background_component_specs(
+                component_specs=shifted_member_specs,
+                principal_axis_deg=principal_axis_deg,
+                amplitude_fraction=los_weight * los_amplitude_fraction,
+                size_multiplier=los_size_multiplier,
+                minimum_size_scale=los_minimum_size_scale,
+                position_shrink=los_position_shrink,
+                position_shrink_parallel=los_position_shrink_parallel,
+                position_shrink_perpendicular=los_position_shrink_perpendicular,
+                shift_x_arcsec=los_shift_x + split_x,
+                shift_y_arcsec=los_shift_y + split_y,
+                layer_name="line_of_sight",
+            )
+        )
     return [*shifted_member_specs, *smooth_background_specs, *los_specs], {
         "principal_axis_deg": float(principal_axis_deg),
         "member_shift_x_arcsec": float(member_shift_x),
         "member_shift_y_arcsec": float(member_shift_y),
         "smooth_background_shift_x_arcsec": float(smooth_background_shift_x),
         "smooth_background_shift_y_arcsec": float(smooth_background_shift_y),
+        "smooth_background_split_parallel_arcsec": float(smooth_background_split_parallel_arcsec),
+        "smooth_background_split_perpendicular_arcsec": float(smooth_background_split_perpendicular_arcsec),
+        "smooth_background_position_shrink_parallel": float(
+            smooth_background_position_shrink
+            if smooth_background_position_shrink_parallel is None
+            else smooth_background_position_shrink_parallel
+        ),
+        "smooth_background_position_shrink_perpendicular": float(
+            smooth_background_position_shrink
+            if smooth_background_position_shrink_perpendicular is None
+            else smooth_background_position_shrink_perpendicular
+        ),
         "line_of_sight_shift_x_arcsec": float(los_shift_x),
         "line_of_sight_shift_y_arcsec": float(los_shift_y),
+        "line_of_sight_split_parallel_arcsec": float(los_split_parallel_arcsec),
+        "line_of_sight_position_shrink_parallel": float(
+            los_position_shrink if los_position_shrink_parallel is None else los_position_shrink_parallel
+        ),
+        "line_of_sight_position_shrink_perpendicular": float(
+            los_position_shrink if los_position_shrink_perpendicular is None else los_position_shrink_perpendicular
+        ),
         "member_component_count": int(len(shifted_member_specs)),
         "smooth_background_component_count": int(len(smooth_background_specs)),
         "line_of_sight_component_count": int(len(los_specs)),
@@ -462,14 +600,21 @@ def execute_search(
                 smooth_background_size_multiplier=float(combo["smooth_background_size_multiplier"]),
                 smooth_background_minimum_size_scale=float(combo["smooth_background_minimum_size_scale"]),
                 smooth_background_position_shrink=float(combo["smooth_background_position_shrink"]),
+                smooth_background_position_shrink_parallel=None,
+                smooth_background_position_shrink_perpendicular=None,
                 smooth_background_shift_parallel_arcsec=0.0,
                 smooth_background_shift_perpendicular_arcsec=0.0,
+                smooth_background_split_parallel_arcsec=0.0,
+                smooth_background_split_perpendicular_arcsec=0.0,
                 los_amplitude_fraction=0.0,
                 los_size_multiplier=float(combo["los_size_multiplier"]),
                 los_minimum_size_scale=float(combo["los_minimum_size_scale"]),
                 los_position_shrink=float(combo["los_position_shrink"]),
+                los_position_shrink_parallel=None,
+                los_position_shrink_perpendicular=None,
                 los_shift_parallel_arcsec=0.0,
                 los_shift_perpendicular_arcsec=0.0,
+                los_split_parallel_arcsec=0.0,
             )
             cluster_results.append(
                 {
@@ -539,14 +684,39 @@ def execute_search(
                     smooth_background_size_multiplier=float(parameters["smooth_background_size_multiplier"]),
                     smooth_background_minimum_size_scale=float(parameters["smooth_background_minimum_size_scale"]),
                     smooth_background_position_shrink=float(parameters["smooth_background_position_shrink"]),
+                    smooth_background_position_shrink_parallel=(
+                        None
+                        if "smooth_background_position_shrink_parallel" not in parameters
+                        else float(parameters["smooth_background_position_shrink_parallel"])
+                    ),
+                    smooth_background_position_shrink_perpendicular=(
+                        None
+                        if "smooth_background_position_shrink_perpendicular" not in parameters
+                        else float(parameters["smooth_background_position_shrink_perpendicular"])
+                    ),
                     smooth_background_shift_parallel_arcsec=float(parameters["smooth_background_shift_parallel_arcsec"]),
                     smooth_background_shift_perpendicular_arcsec=float(parameters["smooth_background_shift_perpendicular_arcsec"]),
+                    smooth_background_split_parallel_arcsec=float(parameters["smooth_background_split_parallel_arcsec"]),
+                    smooth_background_split_perpendicular_arcsec=float(
+                        parameters.get("smooth_background_split_perpendicular_arcsec", 0.0)
+                    ),
                     los_amplitude_fraction=float(parameters["los_amplitude_fraction"]),
                     los_size_multiplier=float(parameters["los_size_multiplier"]),
                     los_minimum_size_scale=float(parameters["los_minimum_size_scale"]),
                     los_position_shrink=float(parameters["los_position_shrink"]),
+                    los_position_shrink_parallel=(
+                        None
+                        if "los_position_shrink_parallel" not in parameters
+                        else float(parameters["los_position_shrink_parallel"])
+                    ),
+                    los_position_shrink_perpendicular=(
+                        None
+                        if "los_position_shrink_perpendicular" not in parameters
+                        else float(parameters["los_position_shrink_perpendicular"])
+                    ),
                     los_shift_parallel_arcsec=float(parameters["los_shift_parallel_arcsec"]),
                     los_shift_perpendicular_arcsec=float(parameters["los_shift_perpendicular_arcsec"]),
+                    los_split_parallel_arcsec=float(parameters.get("los_split_parallel_arcsec", 0.0)),
                 )
                 cluster_results.append(
                     {
@@ -629,14 +799,39 @@ def final_evaluation(
             smooth_background_size_multiplier=float(best_parameters["smooth_background_size_multiplier"]),
             smooth_background_minimum_size_scale=float(best_parameters["smooth_background_minimum_size_scale"]),
             smooth_background_position_shrink=float(best_parameters["smooth_background_position_shrink"]),
+            smooth_background_position_shrink_parallel=(
+                None
+                if "smooth_background_position_shrink_parallel" not in best_parameters
+                else float(best_parameters["smooth_background_position_shrink_parallel"])
+            ),
+            smooth_background_position_shrink_perpendicular=(
+                None
+                if "smooth_background_position_shrink_perpendicular" not in best_parameters
+                else float(best_parameters["smooth_background_position_shrink_perpendicular"])
+            ),
             smooth_background_shift_parallel_arcsec=float(best_parameters["smooth_background_shift_parallel_arcsec"]),
             smooth_background_shift_perpendicular_arcsec=float(best_parameters["smooth_background_shift_perpendicular_arcsec"]),
+            smooth_background_split_parallel_arcsec=float(best_parameters["smooth_background_split_parallel_arcsec"]),
+            smooth_background_split_perpendicular_arcsec=float(
+                best_parameters.get("smooth_background_split_perpendicular_arcsec", 0.0)
+            ),
             los_amplitude_fraction=float(best_parameters["los_amplitude_fraction"]),
             los_size_multiplier=float(best_parameters["los_size_multiplier"]),
             los_minimum_size_scale=float(best_parameters["los_minimum_size_scale"]),
             los_position_shrink=float(best_parameters["los_position_shrink"]),
+            los_position_shrink_parallel=(
+                None
+                if "los_position_shrink_parallel" not in best_parameters
+                else float(best_parameters["los_position_shrink_parallel"])
+            ),
+            los_position_shrink_perpendicular=(
+                None
+                if "los_position_shrink_perpendicular" not in best_parameters
+                else float(best_parameters["los_position_shrink_perpendicular"])
+            ),
             los_shift_parallel_arcsec=float(best_parameters["los_shift_parallel_arcsec"]),
             los_shift_perpendicular_arcsec=float(best_parameters["los_shift_perpendicular_arcsec"]),
+            los_split_parallel_arcsec=float(best_parameters.get("los_split_parallel_arcsec", 0.0)),
         )
         cluster_results.append(
             {
@@ -695,6 +890,38 @@ def write_json(payload: dict, out_path: Path | None) -> None:
 
 
 def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
+    effective_source_amplitude = float(args.source_amplitude)
+    if args.bridge_conversion is not None and args.target_activity_density is not None:
+        effective_source_amplitude = static_source_amplitude_from_activity(
+            activity_density=float(args.target_activity_density),
+            bridge_conversion=float(args.bridge_conversion),
+        )
+    elif args.reference_activity_density is not None and args.target_activity_density is not None:
+        effective_source_amplitude = bridge_matched_source_amplitude(
+            reference_source_amplitude=float(args.source_amplitude),
+            activity_density=float(args.target_activity_density),
+            reference_activity_density=float(args.reference_activity_density),
+        )
+    smooth_background_position_shrink_parallel_values = (
+        args.smooth_background_position_shrink_parallel_values
+        if args.smooth_background_position_shrink_parallel_values
+        else args.smooth_background_position_shrink_values
+    )
+    smooth_background_position_shrink_perpendicular_values = (
+        args.smooth_background_position_shrink_perpendicular_values
+        if args.smooth_background_position_shrink_perpendicular_values
+        else args.smooth_background_position_shrink_values
+    )
+    los_position_shrink_parallel_values = (
+        args.los_position_shrink_parallel_values
+        if args.los_position_shrink_parallel_values
+        else args.los_position_shrink_values
+    )
+    los_position_shrink_perpendicular_values = (
+        args.los_position_shrink_perpendicular_values
+        if args.los_position_shrink_perpendicular_values
+        else args.los_position_shrink_values
+    )
     extra_extent_padding_arcsec = max(
         abs(value)
         for value in [
@@ -704,6 +931,9 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             *args.smooth_background_shift_perpendicular_arcsec_values,
             *args.los_shift_parallel_arcsec_values,
             *args.los_shift_perpendicular_arcsec_values,
+            *args.smooth_background_split_parallel_arcsec_values,
+            *args.smooth_background_split_perpendicular_arcsec_values,
+            *args.los_split_parallel_arcsec_values,
             0.0,
         ]
     ) + 80.0
@@ -754,7 +984,7 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
     search_result = execute_search(
         contexts=coarse_contexts,
         fixed_model_args={
-            "source_amplitude": args.source_amplitude,
+            "source_amplitude": effective_source_amplitude,
             "source_sigma": args.source_sigma,
             "source_core_radius": args.source_core_radius,
             "source_scale_radius": args.source_scale_radius,
@@ -793,12 +1023,19 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "member_shift_perpendicular_arcsec": args.member_shift_perpendicular_arcsec_values,
             "smooth_background_shift_parallel_arcsec": args.smooth_background_shift_parallel_arcsec_values,
             "smooth_background_shift_perpendicular_arcsec": args.smooth_background_shift_perpendicular_arcsec_values,
+            "smooth_background_split_parallel_arcsec": args.smooth_background_split_parallel_arcsec_values,
+            "smooth_background_split_perpendicular_arcsec": args.smooth_background_split_perpendicular_arcsec_values,
+            "smooth_background_position_shrink_parallel": smooth_background_position_shrink_parallel_values,
+            "smooth_background_position_shrink_perpendicular": smooth_background_position_shrink_perpendicular_values,
             "los_amplitude_fraction": args.los_amplitude_fraction_values,
             "los_size_multiplier": args.los_size_multiplier_values,
             "los_minimum_size_scale": [args.los_minimum_size_scale],
             "los_position_shrink": args.los_position_shrink_values,
+            "los_position_shrink_parallel": los_position_shrink_parallel_values,
+            "los_position_shrink_perpendicular": los_position_shrink_perpendicular_values,
             "los_shift_parallel_arcsec": args.los_shift_parallel_arcsec_values,
             "los_shift_perpendicular_arcsec": args.los_shift_perpendicular_arcsec_values,
+            "los_split_parallel_arcsec": args.los_split_parallel_arcsec_values,
         },
         top_k_stage_a=args.top_k_stage_a,
     )
@@ -849,7 +1086,7 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
     final_result = final_evaluation(
         contexts=final_contexts,
         fixed_model_args={
-            "source_amplitude": args.source_amplitude,
+            "source_amplitude": effective_source_amplitude,
             "source_sigma": args.source_sigma,
             "source_core_radius": args.source_core_radius,
             "source_scale_radius": args.source_scale_radius,
@@ -889,10 +1126,21 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "amplitude_scaling_exponent": args.amplitude_scaling_exponent,
             "size_scaling_exponent": args.size_scaling_exponent,
             "source_amplitude": args.source_amplitude,
+            "effective_source_amplitude": effective_source_amplitude,
+            "bridge_conversion": args.bridge_conversion,
+            "reference_activity_density": args.reference_activity_density,
+            "target_activity_density": args.target_activity_density,
             "density_scale": args.density_scale,
             "gravity_scale": args.gravity_scale,
             "smooth_background_shift_parallel_arcsec_values": args.smooth_background_shift_parallel_arcsec_values,
             "smooth_background_shift_perpendicular_arcsec_values": args.smooth_background_shift_perpendicular_arcsec_values,
+            "smooth_background_split_parallel_arcsec_values": args.smooth_background_split_parallel_arcsec_values,
+            "smooth_background_split_perpendicular_arcsec_values": args.smooth_background_split_perpendicular_arcsec_values,
+            "smooth_background_position_shrink_parallel_values": smooth_background_position_shrink_parallel_values,
+            "smooth_background_position_shrink_perpendicular_values": smooth_background_position_shrink_perpendicular_values,
+            "los_split_parallel_arcsec_values": args.los_split_parallel_arcsec_values,
+            "los_position_shrink_parallel_values": los_position_shrink_parallel_values,
+            "los_position_shrink_perpendicular_values": los_position_shrink_perpendicular_values,
             "residual_mode": args.residual_mode,
             "search_grid_size": args.search_grid_size,
             "final_grid_size": args.final_grid_size,
@@ -938,6 +1186,9 @@ def build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument("--size-scaling-exponent", type=float, default=0.5)
     calibrate.add_argument("--minimum-size-scale", type=float, default=0.2)
     calibrate.add_argument("--source-amplitude", type=float, default=1.0e-3)
+    calibrate.add_argument("--bridge-conversion", type=float, default=None)
+    calibrate.add_argument("--reference-activity-density", type=float, default=None)
+    calibrate.add_argument("--target-activity-density", type=float, default=None)
     calibrate.add_argument("--source-sigma", type=float, default=120.0)
     calibrate.add_argument("--source-core-radius", type=float, default=80.0)
     calibrate.add_argument("--source-scale-radius", type=float, default=250.0)
@@ -970,17 +1221,24 @@ def build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument("--smooth-background-amplitude-fraction-values", nargs="+", type=float, default=[0.25, 0.35, 0.45])
     calibrate.add_argument("--smooth-background-size-multiplier-values", nargs="+", type=float, default=[4.0, 5.0, 6.0])
     calibrate.add_argument("--smooth-background-position-shrink-values", nargs="+", type=float, default=[0.6, 0.75, 0.9])
+    calibrate.add_argument("--smooth-background-position-shrink-parallel-values", nargs="*", type=float, default=[])
+    calibrate.add_argument("--smooth-background-position-shrink-perpendicular-values", nargs="*", type=float, default=[])
     calibrate.add_argument("--smooth-background-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--smooth-background-shift-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--smooth-background-split-parallel-arcsec-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--smooth-background-split-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--smooth-background-minimum-size-scale", type=float, default=1.0)
     calibrate.add_argument("--member-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0, 10.0, -10.0])
     calibrate.add_argument("--member-shift-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--los-amplitude-fraction-values", nargs="+", type=float, default=[0.0, 0.1, 0.2])
     calibrate.add_argument("--los-size-multiplier-values", nargs="+", type=float, default=[6.0, 8.0])
     calibrate.add_argument("--los-position-shrink-values", nargs="+", type=float, default=[0.4, 0.6])
+    calibrate.add_argument("--los-position-shrink-parallel-values", nargs="*", type=float, default=[])
+    calibrate.add_argument("--los-position-shrink-perpendicular-values", nargs="*", type=float, default=[])
     calibrate.add_argument("--los-minimum-size-scale", type=float, default=2.0)
     calibrate.add_argument("--los-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0, 40.0, -40.0])
     calibrate.add_argument("--los-shift-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--los-split-parallel-arcsec-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--auto-extent-padding-arcsec", type=float, default=80.0)
     calibrate.add_argument("--minimum-extent-arcsec", type=float, default=120.0)
     calibrate.add_argument(

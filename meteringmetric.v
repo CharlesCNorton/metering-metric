@@ -62,6 +62,9 @@ Definition tortoise (N : R -> R) (L : R) : R :=
 Definition V_eff (N : R -> R) (x : R) : R :=
   / (N x * N x).
 
+Definition V_eff_massive (N : R -> R) (m : R) (x : R) : R :=
+  (m ^ 2) * V_eff N x.
+
 (** ** Basic positivity and continuity facts *)
 
 Lemma lapse_pos :
@@ -302,6 +305,50 @@ Proof.
     lra.
 Qed.
 
+Theorem proper_time_density_path_nonneg_admissible :
+  forall (f : R -> R) (mu gamma v : R -> R) (t : R),
+  0 <= v t <= lapse f mu (gamma t) ->
+  0 <= proper_time_density_path f mu gamma v t.
+Proof.
+  intros f mu gamma v t Hadm.
+  unfold proper_time_density_path.
+  apply sqrt_pos.
+Qed.
+
+Theorem proper_time_density_path_sq_le_lapse_sq_admissible :
+  forall (f : R -> R) (mu gamma v : R -> R) (t : R),
+  0 <= v t <= lapse f mu (gamma t) ->
+  (proper_time_density_path f mu gamma v t) ^ 2 <= (lapse f mu (gamma t)) ^ 2.
+Proof.
+  intros f mu gamma v t Hadm.
+  destruct Hadm as [Hvnonneg Hvle].
+  unfold proper_time_density_path.
+  rewrite pow2_sqrt.
+  - apply Rplus_le_reg_r with ((v t) ^ 2).
+    ring_simplify.
+    assert (Hvsq : 0 <= (v t) ^ 2).
+    {
+      rewrite <- Rsqr_pow2.
+      apply Rle_0_sqr.
+    }
+    replace (lapse f mu (gamma t) ^ 2 + v t ^ 2) with
+      (v t ^ 2 + lapse f mu (gamma t) ^ 2) by ring.
+    replace (lapse f mu (gamma t) ^ 2) with
+      (0 + lapse f mu (gamma t) ^ 2) by ring.
+    lra.
+  - assert (Hlap_nonneg : 0 <= lapse f mu (gamma t)).
+    { eapply Rle_trans; [exact Hvnonneg | exact Hvle]. }
+    assert (Hsq_le : (v t) ^ 2 <= (lapse f mu (gamma t)) ^ 2).
+    {
+      rewrite <- !Rsqr_pow2.
+      apply Rsqr_incr_1.
+      - exact Hvle.
+      - exact Hvnonneg.
+      - exact Hlap_nonneg.
+    }
+    lra.
+Qed.
+
 (**
   Scope note: the proper-time theorem family here treats static observers and
   admissible prescribed paths supported entirely in meterless regions. It
@@ -496,6 +543,78 @@ Theorem forbidden_region_unbounded :
 Proof.
   intros f mu Hf Hmu E HE.
   exact (V_eff_diverges f mu Hf Hmu E HE).
+Qed.
+
+Theorem V_eff_massive_diverges :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall m M, m > 0 -> M > 0 ->
+  exists X, forall x, X < x -> M < V_eff_massive (lapse f mu) m x.
+Proof.
+  intros f mu Hf Hmu m M Hm HM.
+  assert (Hm2pos : m ^ 2 > 0) by nra.
+  assert (Hscaled : M / (m ^ 2) > 0).
+  { apply Rdiv_lt_0_compat; assumption. }
+  destruct (V_eff_diverges f mu Hf Hmu (M / (m ^ 2)) Hscaled) as [X HX].
+  exists X.
+  intros x Hx.
+  unfold V_eff_massive.
+  specialize (HX x Hx).
+  apply (Rmult_lt_compat_l (m ^ 2)) in HX; [|exact Hm2pos].
+  field_simplify in HX.
+  - exact HX.
+  - nra.
+Qed.
+
+Theorem forbidden_region_unbounded_massive :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall m E, m > 0 -> E > 0 ->
+  exists X_E, forall x, X_E < x -> E < V_eff_massive (lapse f mu) m x.
+Proof.
+  intros f mu Hf Hmu m E Hm HE.
+  exact (V_eff_massive_diverges f mu Hf Hmu m E Hm HE).
+Qed.
+
+Theorem turning_threshold_forbidden_massive :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m E, m > 0 -> E > 0 ->
+  lapse f mu x < m / E ->
+  E * E < V_eff_massive (lapse f mu) m x.
+Proof.
+  intros f mu Hf Hmu x m E Hm HE Hturn.
+  assert (Hlap : 0 < lapse f mu x) by (apply lapse_pos; assumption).
+  unfold V_eff_massive, V_eff.
+  replace (m ^ 2) with (m * m) by ring.
+  assert (Hlin : E * lapse f mu x < m).
+  {
+    assert (HinvE : 0 < / E).
+    { apply Rinv_0_lt_compat; lra. }
+    apply (Rmult_lt_reg_r (/ E)); [exact HinvE |].
+    replace (E * lapse f mu x * / E) with (lapse f mu x).
+    2:{ field; lra. }
+    replace (m * / E) with (m / E).
+    2:{ field; lra. }
+    exact Hturn.
+  }
+  assert (Hsq_raw : (E * lapse f mu x) * (E * lapse f mu x) < m * m).
+  {
+    assert (Hmid : (E * lapse f mu x) * (E * lapse f mu x) < (E * lapse f mu x) * m).
+    { apply Rmult_lt_compat_l; nra. }
+    assert (Hhi : (E * lapse f mu x) * m < m * m).
+    { apply Rmult_lt_compat_r; nra. }
+    lra.
+  }
+  assert (Hsq : E ^ 2 * lapse f mu x ^ 2 < m ^ 2).
+  { replace (E ^ 2 * lapse f mu x ^ 2) with ((E * lapse f mu x) * (E * lapse f mu x)) by ring.
+    replace (m ^ 2) with (m * m) by ring.
+    exact Hsq_raw. }
+  apply (Rmult_lt_reg_r (lapse f mu x * lapse f mu x)).
+  - nra.
+  - field_simplify.
+    + exact Hsq.
+    + nra.
 Qed.
 
 Theorem wkb_integral_diverges :
