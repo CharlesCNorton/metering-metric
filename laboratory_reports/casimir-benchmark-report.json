@@ -1,0 +1,693 @@
+{
+  "benchmark_model": {
+    "anomaly_factor_at_alpha_one": 16.0,
+    "scaling_power": 2.0,
+    "statement": "At alpha = 1, the anomalous metering-induced pressure is benchmarked as 16 times the standard Casimir pressure, with weak-coupling scaling proportional to alpha^2."
+  },
+  "measurement_anchors": {
+    "decca_2003_absolute_scan": {
+      "type": "absolute_pressure_scan",
+      "measurement": {
+        "label": "Decca et al. dynamic parallel-plate Casimir pressure",
+        "source": "Phys. Rev. D 68 (2003) 116003 / arXiv:hep-ph/0310157",
+        "note": "Published absolute pressure uncertainty of about 0.6 mPa over 0.2-1.2 um.",
+        "absolute_error_pa": 0.0006,
+        "separation_min_um": 0.2,
+        "separation_max_um": 1.2
+      },
+      "benchmark_model": {
+        "anomaly_factor_at_alpha_one": 16.0,
+        "scaling_power": 2.0,
+        "benchmark_statement": "At alpha = 1, the anomalous metering-induced pressure is taken to be 16 times the standard Casimir pressure."
+      },
+      "best_bound": {
+        "separation_m": 2e-07,
+        "separation_um": 0.2,
+        "standard_casimir_pressure_pa": 0.812578607779846,
+        "absolute_measurement_error_pa": 0.0006,
+        "relative_error_vs_standard_casimir": 0.0007383901006689552,
+        "alpha_upper_bound": 0.006793333591971595
+      },
+      "weakest_bound": {
+        "separation_m": 1.2e-06,
+        "separation_um": 1.2,
+        "standard_casimir_pressure_pa": 0.0006269896664967947,
+        "absolute_measurement_error_pa": 0.0006,
+        "relative_error_vs_standard_casimir": 0.956953570466966,
+        "alpha_upper_bound": 0.24456000931097746
+      },
+      "rows": [
+        {
+          "separation_m": 2e-07,
+          "separation_um": 0.2,
+          "standard_casimir_pressure_pa": 0.812578607779846,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0007383901006689552,
+          "alpha_upper_bound": 0.006793333591971595,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 13.001257724477536
+        },
+        {
+          "separation_m": 2.0576978453101648e-07,
+          "separation_um": 0.2057697845310165,
+          "standard_casimir_pressure_pa": 0.7252019382427481,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0008273557589405682,
+          "alpha_upper_bound": 0.007190948124815358,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 11.60323101188397
+        },
+        {
+          "separation_m": 2.117060211297047e-07,
+          "separation_um": 0.2117060211297047,
+          "standard_casimir_pressure_pa": 0.6472208918568124,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0009270405321414449,
+          "alpha_upper_bound": 0.007611835078273853,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 10.355534269708999
+        },
+        {
+          "separation_m": 2.1781351175889032e-07,
+          "separation_um": 0.21781351175889033,
+          "standard_casimir_pressure_pa": 0.577625156202649,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.001038735923387487,
+          "alpha_upper_bound": 0.008057356589584324,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 9.242002499242384
+        },
+        {
+          "separation_m": 2.240971969128544e-07,
+          "separation_um": 0.2240971969128544,
+          "standard_casimir_pressure_pa": 0.5155130578695023,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.001163889043819109,
+          "alpha_upper_bound": 0.008528954522020522,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 8.248208925912037
+        },
+        {
+          "separation_m": 2.3056215961381406e-07,
+          "separation_um": 0.23056215961381407,
+          "standard_casimir_pressure_pa": 0.4600798804904026,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0013041213611872256,
+          "alpha_upper_bound": 0.009028155131265833,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 7.361278087846442
+        },
+        {
+          "separation_m": 2.372136295237017e-07,
+          "separation_um": 0.2372136295237017,
+          "standard_casimir_pressure_pa": 0.41060743894026924,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0014612497073811697,
+          "alpha_upper_bound": 0.009556574004910081,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 6.569719023044308
+        },
+        {
+          "separation_m": 2.440569871745623e-07,
+          "separation_um": 0.24405698717456234,
+          "standard_casimir_pressure_pa": 0.36645477462169507,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0016373098170692478,
+          "alpha_upper_bound": 0.010115921291055402,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 5.863276393947121
+        },
+        {
+          "separation_m": 2.510977683209931e-07,
+          "separation_um": 0.2510977683209931,
+          "standard_casimir_pressure_pa": 0.3270498512877003,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0018345827024155712,
+          "alpha_upper_bound": 0.010708007232952973,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 5.232797620603205
+        },
+        {
+          "separation_m": 2.5834166841814923e-07,
+          "separation_um": 0.25834166841814926,
+          "standard_casimir_pressure_pa": 0.29188214381358885,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.002055624205580699,
+          "alpha_upper_bound": 0.011334748027582867,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 4.6701143010174215
+        },
+        {
+          "separation_m": 2.657945472289293e-07,
+          "separation_um": 0.2657945472289293,
+          "standard_casimir_pressure_pa": 0.260496023899035,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0023032981118842433,
+          "alpha_upper_bound": 0.011998172027136683,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 4.16793638238456
+        },
+        {
+          "separation_m": 2.734624335640793e-07,
+          "separation_um": 0.27346243356407934,
+          "standard_casimir_pressure_pa": 0.2324848570063414,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0025808132526396505,
+          "alpha_upper_bound": 0.012700426303474153,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 3.719757712101462
+        },
+        {
+          "separation_m": 2.8135153015903997e-07,
+          "separation_um": 0.28135153015903996,
+          "standard_casimir_pressure_pa": 0.2074857340556102,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0028917650783604637,
+          "alpha_upper_bound": 0.013443783596797777,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 3.319771744889763
+        },
+        {
+          "separation_m": 2.8946821869148716e-07,
+          "separation_um": 0.28946821869148714,
+          "standard_casimir_pressure_pa": 0.18517476962132248,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.00324018224095531,
+          "alpha_upper_bound": 0.014230649671034238,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 2.9627963139411597
+        },
+        {
+          "separation_m": 2.978190649436217e-07,
+          "separation_um": 0.2978190649436217,
+          "standard_casimir_pressure_pa": 0.16526290571437474,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.003630578788424457,
+          "alpha_upper_bound": 0.015063571099726936,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 2.644206491429996
+        },
+        {
+          "separation_m": 3.0641082411338915e-07,
+          "separation_um": 0.30641082411338916,
+          "standard_casimir_pressure_pa": 0.14749216678389862,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.004068012648285947,
+          "alpha_upper_bound": 0.015945243507637995,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 2.359874668542378
+        },
+        {
+          "separation_m": 3.152504462789163e-07,
+          "separation_um": 0.3152504462789163,
+          "standard_casimir_pressure_pa": 0.1316323174191726,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.004558151157434597,
+          "alpha_upper_bound": 0.016878520294731476,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 2.106117078706762
+        },
+        {
+          "separation_m": 3.2434508202059695e-07,
+          "separation_um": 0.324345082020597,
+          "standard_casimir_pressure_pa": 0.11747787944921123,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.005107344487430893,
+          "alpha_upper_bound": 0.01786642187077286,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 1.8796460711873797
+        },
+        {
+          "separation_m": 3.3370208820536545e-07,
+          "separation_um": 0.33370208820536545,
+          "standard_casimir_pressure_pa": 0.10484546979397971,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.005722707916507922,
+          "alpha_upper_bound": 0.018912145430430287,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 1.6775275167036754
+        },
+        {
+          "separation_m": 3.4332903393784073e-07,
+          "separation_um": 0.34332903393784076,
+          "standard_casimir_pressure_pa": 0.09357142457676712,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0064122140142020894,
+          "alpha_upper_bound": 0.02001907530051352,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 1.497142793228274
+        },
+        {
+          "separation_m": 3.5323370668315763e-07,
+          "separation_um": 0.3532337066831576,
+          "standard_casimir_pressure_pa": 0.08350967871602107,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.007184795932940069,
+          "alpha_upper_bound": 0.02119079389283833,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 1.336154859456337
+        },
+        {
+          "separation_m": 3.6342411856642805e-07,
+          "separation_um": 0.3634241185664281,
+          "standard_casimir_pressure_pa": 0.07452987352492026,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.008050463144813742,
+          "alpha_upper_bound": 0.022431093298162237,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 1.192477976398724
+        },
+        {
+          "separation_m": 3.7390851285394235e-07,
+          "separation_um": 0.3739085128539424,
+          "standard_casimir_pressure_pa": 0.06651566780097018,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.009020431123015028,
+          "alpha_upper_bound": 0.023743987558715558,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 1.0642506848155229
+        },
+        {
+          "separation_m": 3.846953706213426e-07,
+          "separation_um": 0.3846953706213426,
+          "standard_casimir_pressure_pa": 0.05936323052433026,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.010107266648065716,
+          "alpha_upper_bound": 0.02513372565904441,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.9498116883892842
+        },
+        {
+          "separation_m": 3.9579341761416504e-07,
+          "separation_um": 0.39579341761416503,
+          "standard_casimir_pressure_pa": 0.05297989563645947,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.011325050621411467,
+          "alpha_upper_bound": 0.026604805277209168,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.8476783301833515
+        },
+        {
+          "separation_m": 4.0721163130630675e-07,
+          "separation_um": 0.4072116313063068,
+          "standard_casimir_pressure_pa": 0.04728296147056394,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.01268956049577247,
+          "alpha_upper_bound": 0.02816198734084261,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.756527383529023
+        },
+        {
+          "separation_m": 4.1895924816211227e-07,
+          "separation_um": 0.4189592481621123,
+          "standard_casimir_pressure_pa": 0.04219861927942897,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.014218474685793537,
+          "alpha_upper_bound": 0.029810311435174507,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.6751779084708636
+        },
+        {
+          "separation_m": 4.3104577110797245e-07,
+          "separation_um": 0.4310457711079725,
+          "standard_casimir_pressure_pa": 0.03766099697876975,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.015931601607313578,
+          "alpha_upper_bound": 0.03155511211289066,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.602575951660316
+        },
+        {
+          "separation_m": 4.4348097721946666e-07,
+          "separation_um": 0.44348097721946667,
+          "standard_casimir_pressure_pa": 0.03361130571696981,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.017851136312656533,
+          "alpha_upper_bound": 0.03340203615860915,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.537780891471517
+        },
+        {
+          "separation_m": 4.562749256302704e-07,
+          "separation_um": 0.45627492563027044,
+          "standard_casimir_pressure_pa": 0.02999707821427199,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.020001948046877858,
+          "alpha_upper_bound": 0.035357060863848204,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.4799532514283518
+        },
+        {
+          "separation_m": 4.6943796566923144e-07,
+          "separation_um": 0.46943796566923146,
+          "standard_casimir_pressure_pa": 0.026771489003440795,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.02241190245050939,
+          "alpha_upper_bound": 0.037426513371630506,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.4283438240550527
+        },
+        {
+          "separation_m": 4.829807452321822e-07,
+          "separation_um": 0.48298074523218226,
+          "standard_casimir_pressure_pa": 0.023892747765025816,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.025112222583217467,
+          "alpha_upper_bound": 0.0396170911533279,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.38228396424041305
+        },
+        {
+          "separation_m": 4.969142193952794e-07,
+          "separation_um": 0.49691421939527947,
+          "standard_casimir_pressure_pa": 0.02132355789735026,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.02813789344575363,
+          "alpha_upper_bound": 0.04193588368401937,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.34117692635760416
+        },
+        {
+          "separation_m": 5.112496592768245e-07,
+          "separation_um": 0.5112496592768245,
+          "standard_casimir_pressure_pa": 0.01903063330653118,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.031528115241129896,
+          "alpha_upper_bound": 0.04439039538650921,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.3044901329044989
+        },
+        {
+          "separation_m": 5.259986611547387e-07,
+          "separation_um": 0.5259986611547387,
+          "standard_casimir_pressure_pa": 0.01698426715612304,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.03532681124741332,
+          "alpha_upper_bound": 0.046988569918261315,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.2717482744979686
+        },
+        {
+          "separation_m": 5.411731558470675e-07,
+          "separation_um": 0.5411731558470675,
+          "standard_casimir_pressure_pa": 0.015157946989161026,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.03958319688207389,
+          "alpha_upper_bound": 0.04973881587985,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.24252715182657641
+        },
+        {
+          "separation_m": 5.567854183631062e-07,
+          "separation_um": 0.5567854183631062,
+          "standard_casimir_pressure_pa": 0.013528011236174042,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.044352417330612036,
+          "alpha_upper_bound": 0.05265003402813005,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.21644817977878467
+        },
+        {
+          "separation_m": 5.728480778329411e-07,
+          "separation_um": 0.5728480778329411,
+          "standard_casimir_pressure_pa": 0.012073342658930898,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.04969626200049641,
+          "alpha_upper_bound": 0.055731646082194865,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.19317348254289438
+        },
+        {
+          "separation_m": 5.893741277234561e-07,
+          "separation_um": 0.5893741277234561,
+          "standard_casimir_pressure_pa": 0.010775094758214126,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.055683965056790324,
+          "alpha_upper_bound": 0.05899362521535183,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.172401516131426
+        },
+        {
+          "separation_m": 6.063769363490567e-07,
+          "separation_um": 0.6063769363490566,
+          "standard_casimir_pressure_pa": 0.009616447600997221,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.062393102411100354,
+          "alpha_upper_bound": 0.06244652833179577,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.15386316161595553
+        },
+        {
+          "separation_m": 6.238702576856151e-07,
+          "separation_um": 0.6238702576856151,
+          "standard_casimir_pressure_pa": 0.008582389903553204,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.06991059678512082,
+          "alpha_upper_bound": 0.06610153023243903,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.13731823845685126
+        },
+        {
+          "separation_m": 6.418682424963936e-07,
+          "separation_um": 0.6418682424963936,
+          "standard_casimir_pressure_pa": 0.007659524547190707,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.07833384387025207,
+          "alpha_upper_bound": 0.06997045978047274,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.12255239275505131
+        },
+        {
+          "separation_m": 6.603854497789257e-07,
+          "separation_um": 0.6603854497789257,
+          "standard_casimir_pressure_pa": 0.006835895006905672,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.0877719741736635,
+          "alpha_upper_bound": 0.07406583818369956,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.10937432011049075
+        },
+        {
+          "separation_m": 6.794368585421396e-07,
+          "separation_um": 0.6794368585421396,
+          "standard_casimir_pressure_pa": 0.0061008304441790605,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.09834726689912739,
+          "alpha_upper_bound": 0.07840091951753794,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.09761328710686497
+        },
+        {
+          "separation_m": 6.990378799232338e-07,
+          "separation_um": 0.6990378799232339,
+          "standard_casimir_pressure_pa": 0.005444807456963868,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.11019673418067417,
+          "alpha_upper_bound": 0.08298973361984081,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.08711691931142189
+        },
+        {
+          "separation_m": 7.192043696541104e-07,
+          "separation_um": 0.7192043696541104,
+          "standard_casimir_pressure_pa": 0.004859326695711635,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.12347389619419931,
+          "alpha_upper_bound": 0.08784713149635255,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.07774922713138616
+        },
+        {
+          "separation_m": 7.399526408874589e-07,
+          "separation_um": 0.7399526408874589,
+          "standard_casimir_pressure_pa": 0.004336802746891381,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.13835077014514433,
+          "alpha_upper_bound": 0.09298883338375377,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.0693888439502621
+        },
+        {
+          "separation_m": 7.612994773928451e-07,
+          "separation_um": 0.7612994773928452,
+          "standard_casimir_pressure_pa": 0.00387046585734657,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.1550200989013077,
+          "alpha_upper_bound": 0.09843147962583784,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.06192745371754512
+        },
+        {
+          "separation_m": 7.832621471335058e-07,
+          "separation_um": 0.7832621471335058,
+          "standard_casimir_pressure_pa": 0.0034542742262427205,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.17369784814468286,
+          "alpha_upper_bound": 0.1041926845274786,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.05526838761988353
+        },
+        {
+          "separation_m": 8.05858416234814e-07,
+          "separation_um": 0.805858416234814,
+          "standard_casimir_pressure_pa": 0.0030828357282719535,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.19462600439509073,
+          "alpha_upper_bound": 0.11029109336067519,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.049325371652351256
+        },
+        {
+          "separation_m": 8.291065633557175e-07,
+          "separation_um": 0.8291065633557175,
+          "standard_casimir_pressure_pa": 0.0027513380539702223,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.2180757101564422,
+          "alpha_upper_bound": 0.11674644270716619,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.044021408863523556
+        },
+        {
+          "separation_m": 8.530253944747876e-07,
+          "separation_um": 0.8530253944747876,
+          "standard_casimir_pressure_pa": 0.002455486362053999,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.2443507768041944,
+          "alpha_upper_bound": 0.12357962433290591,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.039287781792863984
+        },
+        {
+          "separation_m": 8.776342581028117e-07,
+          "separation_um": 0.8776342581028118,
+          "standard_casimir_pressure_pa": 0.002191447636008468,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.2737916207264929,
+          "alpha_upper_bound": 0.1308127528011157,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.03506316217613549
+        },
+        {
+          "separation_m": 9.029530609342703e-07,
+          "separation_um": 0.9029530609342703,
+          "standard_casimir_pressure_pa": 0.0019558010240178603,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.3067796737151728,
+          "alpha_upper_bound": 0.1384692370427392,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.031292816384285764
+        },
+        {
+          "separation_m": 9.290022839503328e-07,
+          "separation_um": 0.9290022839503328,
+          "standard_casimir_pressure_pa": 0.001745493518848803,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.34374232474705213,
+          "alpha_upper_bound": 0.14657385611592116,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.027927896301580848
+        },
+        {
+          "separation_m": 9.558029989864106e-07,
+          "separation_um": 0.9558029989864106,
+          "standard_casimir_pressure_pa": 0.0015578004034807965,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.3851584571806129,
+          "alpha_upper_bound": 0.15515283939969746,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.024924806455692745
+        },
+        {
+          "separation_m": 9.833768857776634e-07,
+          "separation_um": 0.9833768857776635,
+          "standard_casimir_pressure_pa": 0.0013902899500225284,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.4315646531072727,
+          "alpha_upper_bound": 0.16423395148142952,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.022244639200360454
+        },
+        {
+          "separation_m": 1.0117462494962588e-06,
+          "separation_um": 1.0117462494962588,
+          "standard_casimir_pressure_pa": 0.0012407919145576585,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.48356214524004176,
+          "alpha_upper_bound": 0.17384658201271203,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.019852670632922537
+        },
+        {
+          "separation_m": 1.0409340387945458e-06,
+          "separation_um": 1.0409340387945458,
+          "standard_casimir_pressure_pa": 0.001107369419743495,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.5418246064073006,
+          "alpha_upper_bound": 0.18402184082455073,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.01771791071589592
+        },
+        {
+          "separation_m": 1.070963864368772e-06,
+          "separation_um": 1.0709638643687722,
+          "standard_casimir_pressure_pa": 0.0009882938608769122,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.6071068775714346,
+          "alpha_upper_bound": 0.19479265860964745,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.015812701774030595
+        },
+        {
+          "separation_m": 1.1018600180583324e-06,
+          "separation_um": 1.1018600180583324,
+          "standard_casimir_pressure_pa": 0.0008820225103138981,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.6802547474513653,
+          "alpha_upper_bound": 0.20619389349762599,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.01411236016502237
+        },
+        {
+          "separation_m": 1.1336474924960248e-06,
+          "separation_um": 1.133647492496025,
+          "standard_casimir_pressure_pa": 0.0007871785300883456,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.7622159104525646,
+          "alpha_upper_bound": 0.2182624438681224,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.01259485648141353
+        },
+        {
+          "separation_m": 1.1663520013251705e-06,
+          "separation_um": 1.1663520013251705,
+          "standard_casimir_pressure_pa": 0.0007025331337762852,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.8540522448739963,
+          "alpha_upper_bound": 0.2310373677668285,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.011240530140420563
+        },
+        {
+          "separation_m": 1.2e-06,
+          "separation_um": 1.2,
+          "standard_casimir_pressure_pa": 0.0006269896664967947,
+          "absolute_measurement_error_pa": 0.0006,
+          "relative_error_vs_standard_casimir": 0.956953570466966,
+          "alpha_upper_bound": 0.24456000931097746,
+          "benchmark_anomalous_pressure_at_alpha_one_pa": 0.010031834663948715
+        }
+      ]
+    },
+    "decca_2007_relative_point": {
+      "type": "relative_pressure_point",
+      "measurement": {
+        "label": "Decca et al. gold-plate Casimir pressure minimum relative error",
+        "source": "Phys. Rev. D 75 (2007) 077101 / arXiv:hep-ph/0703290",
+        "note": "Published minimum relative experimental error of about 0.19% in the 160-750 nm range.",
+        "relative_error": 0.0019,
+        "separation_m": 1.6e-07,
+        "separation_um": 0.16
+      },
+      "derived": {
+        "standard_casimir_pressure_pa": 1.9838344916500141,
+        "absolute_error_pa": 0.003769285534135027,
+        "alpha_upper_bound": 0.010897247358851683,
+        "benchmark_anomalous_pressure_at_alpha_one_pa": 31.741351866400226
+      }
+    }
+  },
+  "strongest_bound": {
+    "label": "Decca et al. dynamic parallel-plate Casimir pressure",
+    "source": "Phys. Rev. D 68 (2003) 116003 / arXiv:hep-ph/0310157",
+    "alpha_upper_bound": 0.006793333591971595,
+    "anchor_type": "absolute_pressure_scan",
+    "reference_separation_um": 0.2
+  },
+  "reference_target_scan": {
+    "reference_separation_m": 2e-07,
+    "reference_separation_um": 0.2,
+    "alpha_target_table": [
+      {
+        "alpha_target": 0.1,
+        "reference_separation_m": 2e-07,
+        "reference_separation_um": 0.2,
+        "standard_casimir_pressure_pa": 0.812578607779846,
+        "required_relative_anomaly": 0.16000000000000003,
+        "required_absolute_anomaly_pa": 0.13001257724477538,
+        "required_absolute_anomaly_mpa": 130.01257724477537,
+        "decca_2003_error_ratio": 216.68762874129231
+      },
+      {
+        "alpha_target": 0.01,
+        "reference_separation_m": 2e-07,
+        "reference_separation_um": 0.2,
+        "standard_casimir_pressure_pa": 0.812578607779846,
+        "required_relative_anomaly": 0.0016,
+        "required_absolute_anomaly_pa": 0.0013001257724477536,
+        "required_absolute_anomaly_mpa": 1.3001257724477535,
+        "decca_2003_error_ratio": 2.166876287412923
+      },
+      {
+        "alpha_target": 0.001,
+        "reference_separation_m": 2e-07,
+        "reference_separation_um": 0.2,
+        "standard_casimir_pressure_pa": 0.812578607779846,
+        "required_relative_anomaly": 1.6e-05,
+        "required_absolute_anomaly_pa": 1.3001257724477535e-05,
+        "required_absolute_anomaly_mpa": 0.013001257724477534,
+        "decca_2003_error_ratio": 0.02166876287412923
+      },
+      {
+        "alpha_target": 0.0001,
+        "reference_separation_m": 2e-07,
+        "reference_separation_um": 0.2,
+        "standard_casimir_pressure_pa": 0.812578607779846,
+        "required_relative_anomaly": 1.6e-07,
+        "required_absolute_anomaly_pa": 1.3001257724477536e-07,
+        "required_absolute_anomaly_mpa": 0.00013001257724477535,
+        "decca_2003_error_ratio": 0.0002166876287412923
+      }
+    ]
+  },
+  "executive_summary": {
+    "benchmark_lab_bound_alpha_upper": 0.006793333591971595,
+    "recommended_reading": "This is a benchmark-model null bound. It is stronger than the older internal WEC consistency cutoff, but it still rests on the repository's present Casimir-scale anomaly model rather than a completed first-principles lab derivation."
+  }
+}

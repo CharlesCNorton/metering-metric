@@ -11,6 +11,6 @@
 9. Rebuild `lensing.py` around confounder control: mass, radius, redshift, magnification, local convergence, and model family.
 10. Require every complexity or decoherence proxy to show conditional signal beyond mass.
 11. Upgrade the proxy inputs before expanding the cluster sample.
-12. Design one falsification-grade laboratory bound on the massive-sector coupling and make it a first-class target.
+12. Tighten the Casimir benchmark null into a first-principles laboratory derivation and a purpose-built active-vs-inert differential design.
 13. Rewrite `README.md` as a disciplined technical argument.
 14. Split the outputs into separate rigorous products: core theory, analogue evidence, and observational result.
