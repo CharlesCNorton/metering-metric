@@ -164,6 +164,38 @@ def shift_component_specs(
     return shifted
 
 
+def rotate_component_specs(
+    component_specs: list[dict],
+    rotation_deg: float,
+    layer_override: str | None = None,
+) -> list[dict]:
+    if abs(rotation_deg) <= 1.0e-12:
+        return [
+            {
+                **spec,
+                "layer": layer_override or spec.get("layer", "member"),
+            }
+            for spec in component_specs
+        ]
+    angle = math.radians(rotation_deg)
+    cos_angle = math.cos(angle)
+    sin_angle = math.sin(angle)
+    rotated = []
+    for spec in component_specs:
+        x_arcsec = float(spec["center_x"])
+        y_arcsec = float(spec["center_y"])
+        row = {
+            **spec,
+            "center_x": (x_arcsec * cos_angle) - (y_arcsec * sin_angle),
+            "center_y": (x_arcsec * sin_angle) + (y_arcsec * cos_angle),
+            "layer": layer_override or spec.get("layer", "member"),
+        }
+        if "orientation_deg" in row:
+            row["orientation_deg"] = float(row["orientation_deg"]) + rotation_deg
+        rotated.append(row)
+    return rotated
+
+
 def build_shifted_background_component_specs(
     component_specs: list[dict],
     principal_axis_deg: float,
@@ -324,6 +356,7 @@ def build_theory_component_specs(
     base_member_specs: list[dict],
     member_shift_parallel_arcsec: float,
     member_shift_perpendicular_arcsec: float,
+    member_rotation_deg: float,
     member_source_kind: str | None,
     smooth_background_amplitude_fraction: float,
     smooth_background_size_multiplier: float,
@@ -354,6 +387,7 @@ def build_theory_component_specs(
     los_shift_parallel_arcsec: float,
     los_shift_perpendicular_arcsec: float,
     los_split_parallel_arcsec: float,
+    los_split_perpendicular_arcsec: float,
 ) -> tuple[list[dict], dict[str, object]]:
     principal_axis_deg = component_principal_axis_deg(base_member_specs)
     member_axis_ratio = component_principal_axis_ratio(base_member_specs)
@@ -368,6 +402,10 @@ def build_theory_component_specs(
         component_specs=base_member_specs,
         shift_x_arcsec=member_shift_x,
         shift_y_arcsec=member_shift_y,
+    )
+    shifted_member_specs = rotate_component_specs(
+        component_specs=shifted_member_specs,
+        rotation_deg=member_rotation_deg,
     )
     if member_source_kind is not None:
         shifted_member_specs = [
@@ -418,7 +456,7 @@ def build_theory_component_specs(
     los_offsets = split_axis_offsets(
         principal_axis_deg=principal_axis_deg,
         split_parallel_arcsec=los_split_parallel_arcsec,
-        split_perpendicular_arcsec=0.0,
+        split_perpendicular_arcsec=los_split_perpendicular_arcsec,
     )
     los_weight = 1.0 / max(len(los_offsets), 1)
     los_specs = []
@@ -448,6 +486,7 @@ def build_theory_component_specs(
         "member_axis_ratio": float(member_axis_ratio),
         "member_shift_x_arcsec": float(member_shift_x),
         "member_shift_y_arcsec": float(member_shift_y),
+        "member_rotation_deg": float(member_rotation_deg),
         "member_source_kind": member_source_kind or "inherit",
         "smooth_background_shift_x_arcsec": float(smooth_background_shift_x),
         "smooth_background_shift_y_arcsec": float(smooth_background_shift_y),
@@ -471,6 +510,7 @@ def build_theory_component_specs(
         "line_of_sight_shift_x_arcsec": float(los_shift_x),
         "line_of_sight_shift_y_arcsec": float(los_shift_y),
         "line_of_sight_split_parallel_arcsec": float(los_split_parallel_arcsec),
+        "line_of_sight_split_perpendicular_arcsec": float(los_split_perpendicular_arcsec),
         "line_of_sight_position_shrink_parallel": float(
             los_position_shrink if los_position_shrink_parallel is None else los_position_shrink_parallel
         ),
@@ -669,6 +709,7 @@ def execute_search(
                 base_member_specs=context.component_specs,
                 member_shift_parallel_arcsec=0.0,
                 member_shift_perpendicular_arcsec=0.0,
+                member_rotation_deg=0.0,
                 member_source_kind=resolve_optional_source_kind(combo.get("member_source_kind", None)),
                 smooth_background_amplitude_fraction=float(combo["smooth_background_amplitude_fraction"]),
                 smooth_background_size_multiplier=float(combo["smooth_background_size_multiplier"]),
@@ -699,6 +740,7 @@ def execute_search(
                 los_shift_parallel_arcsec=0.0,
                 los_shift_perpendicular_arcsec=0.0,
                 los_split_parallel_arcsec=0.0,
+                los_split_perpendicular_arcsec=0.0,
             )
             cluster_results.append(
                 {
@@ -764,6 +806,7 @@ def execute_search(
                     base_member_specs=context.component_specs,
                     member_shift_parallel_arcsec=float(parameters["member_shift_parallel_arcsec"]),
                     member_shift_perpendicular_arcsec=float(parameters["member_shift_perpendicular_arcsec"]),
+                    member_rotation_deg=float(parameters.get("member_rotation_deg", 0.0)),
                     member_source_kind=resolve_optional_source_kind(parameters.get("member_source_kind", None)),
                     smooth_background_amplitude_fraction=float(parameters["smooth_background_amplitude_fraction"]),
                     smooth_background_size_multiplier=float(parameters["smooth_background_size_multiplier"]),
@@ -813,6 +856,7 @@ def execute_search(
                     los_shift_parallel_arcsec=float(parameters["los_shift_parallel_arcsec"]),
                     los_shift_perpendicular_arcsec=float(parameters["los_shift_perpendicular_arcsec"]),
                     los_split_parallel_arcsec=float(parameters.get("los_split_parallel_arcsec", 0.0)),
+                    los_split_perpendicular_arcsec=float(parameters.get("los_split_perpendicular_arcsec", 0.0)),
                 )
                 cluster_results.append(
                     {
@@ -891,6 +935,7 @@ def final_evaluation(
             base_member_specs=context.component_specs,
             member_shift_parallel_arcsec=float(best_parameters["member_shift_parallel_arcsec"]),
             member_shift_perpendicular_arcsec=float(best_parameters["member_shift_perpendicular_arcsec"]),
+            member_rotation_deg=float(best_parameters.get("member_rotation_deg", 0.0)),
             member_source_kind=resolve_optional_source_kind(best_parameters.get("member_source_kind", None)),
             smooth_background_amplitude_fraction=float(best_parameters["smooth_background_amplitude_fraction"]),
             smooth_background_size_multiplier=float(best_parameters["smooth_background_size_multiplier"]),
@@ -938,6 +983,7 @@ def final_evaluation(
             los_shift_parallel_arcsec=float(best_parameters["los_shift_parallel_arcsec"]),
             los_shift_perpendicular_arcsec=float(best_parameters["los_shift_perpendicular_arcsec"]),
             los_split_parallel_arcsec=float(best_parameters.get("los_split_parallel_arcsec", 0.0)),
+            los_split_perpendicular_arcsec=float(best_parameters.get("los_split_perpendicular_arcsec", 0.0)),
         )
         cluster_results.append(
             {
@@ -1008,6 +1054,12 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             activity_density=float(args.target_activity_density),
             reference_activity_density=float(args.reference_activity_density),
         )
+    smooth_background_source_beta_values = [None] if not args.smooth_background_source_beta_values else args.smooth_background_source_beta_values
+    smooth_background_source_outer_slope_values = (
+        [None] if not args.smooth_background_source_outer_slope_values else args.smooth_background_source_outer_slope_values
+    )
+    los_source_beta_values = [None] if not args.los_source_beta_values else args.los_source_beta_values
+    los_source_outer_slope_values = [None] if not args.los_source_outer_slope_values else args.los_source_outer_slope_values
     smooth_background_position_shrink_parallel_values = (
         args.smooth_background_position_shrink_parallel_values
         if args.smooth_background_position_shrink_parallel_values
@@ -1040,6 +1092,7 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             *args.smooth_background_split_parallel_arcsec_values,
             *args.smooth_background_split_perpendicular_arcsec_values,
             *args.los_split_parallel_arcsec_values,
+            *args.los_split_perpendicular_arcsec_values,
             0.0,
         ]
     ) + 80.0
@@ -1122,6 +1175,8 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "smooth_background_minimum_size_scale": [args.smooth_background_minimum_size_scale],
             "smooth_background_position_shrink": args.smooth_background_position_shrink_values,
             "smooth_background_source_kind": args.smooth_background_source_kind_values,
+            "smooth_background_source_beta": smooth_background_source_beta_values,
+            "smooth_background_source_outer_slope": smooth_background_source_outer_slope_values,
             "smooth_background_axis_ratio": args.smooth_background_axis_ratio_values,
             "smooth_background_angle_offset_deg": args.smooth_background_angle_offset_deg_values,
             "los_size_multiplier": [args.los_size_multiplier_values[0]],
@@ -1131,6 +1186,7 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
         stage_b_space={
             "member_shift_parallel_arcsec": args.member_shift_parallel_arcsec_values,
             "member_shift_perpendicular_arcsec": args.member_shift_perpendicular_arcsec_values,
+            "member_rotation_deg": args.member_rotation_deg_values,
             "smooth_background_shift_parallel_arcsec": args.smooth_background_shift_parallel_arcsec_values,
             "smooth_background_shift_perpendicular_arcsec": args.smooth_background_shift_perpendicular_arcsec_values,
             "smooth_background_split_parallel_arcsec": args.smooth_background_split_parallel_arcsec_values,
@@ -1144,11 +1200,14 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "los_position_shrink_parallel": los_position_shrink_parallel_values,
             "los_position_shrink_perpendicular": los_position_shrink_perpendicular_values,
             "los_source_kind": args.los_source_kind_values,
+            "los_source_beta": los_source_beta_values,
+            "los_source_outer_slope": los_source_outer_slope_values,
             "los_axis_ratio": args.los_axis_ratio_values,
             "los_angle_offset_deg": args.los_angle_offset_deg_values,
             "los_shift_parallel_arcsec": args.los_shift_parallel_arcsec_values,
             "los_shift_perpendicular_arcsec": args.los_shift_perpendicular_arcsec_values,
             "los_split_parallel_arcsec": args.los_split_parallel_arcsec_values,
+            "los_split_perpendicular_arcsec": args.los_split_perpendicular_arcsec_values,
         },
         top_k_stage_a=args.top_k_stage_a,
     )
@@ -1252,12 +1311,18 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "smooth_background_position_shrink_parallel_values": smooth_background_position_shrink_parallel_values,
             "smooth_background_position_shrink_perpendicular_values": smooth_background_position_shrink_perpendicular_values,
             "smooth_background_source_kind_values": args.smooth_background_source_kind_values,
+            "smooth_background_source_beta_values": smooth_background_source_beta_values,
+            "smooth_background_source_outer_slope_values": smooth_background_source_outer_slope_values,
             "smooth_background_axis_ratio_values": args.smooth_background_axis_ratio_values,
             "smooth_background_angle_offset_deg_values": args.smooth_background_angle_offset_deg_values,
+            "member_rotation_deg_values": args.member_rotation_deg_values,
             "los_split_parallel_arcsec_values": args.los_split_parallel_arcsec_values,
+            "los_split_perpendicular_arcsec_values": args.los_split_perpendicular_arcsec_values,
             "los_position_shrink_parallel_values": los_position_shrink_parallel_values,
             "los_position_shrink_perpendicular_values": los_position_shrink_perpendicular_values,
             "los_source_kind_values": args.los_source_kind_values,
+            "los_source_beta_values": los_source_beta_values,
+            "los_source_outer_slope_values": los_source_outer_slope_values,
             "los_axis_ratio_values": args.los_axis_ratio_values,
             "los_angle_offset_deg_values": args.los_angle_offset_deg_values,
             "residual_mode": args.residual_mode,
@@ -1348,6 +1413,8 @@ def build_parser() -> argparse.ArgumentParser:
         default=["inherit", "beta_model", "softened_nfw"],
         choices=["inherit", "gaussian", "beta_model", "softened_nfw"],
     )
+    calibrate.add_argument("--smooth-background-source-beta-values", nargs="*", type=float, default=[])
+    calibrate.add_argument("--smooth-background-source-outer-slope-values", nargs="*", type=float, default=[])
     calibrate.add_argument("--smooth-background-axis-ratio-values", nargs="+", type=float, default=[1.0])
     calibrate.add_argument("--smooth-background-angle-offset-deg-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--smooth-background-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0])
@@ -1357,6 +1424,7 @@ def build_parser() -> argparse.ArgumentParser:
     calibrate.add_argument("--smooth-background-minimum-size-scale", type=float, default=1.0)
     calibrate.add_argument("--member-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0, 10.0, -10.0])
     calibrate.add_argument("--member-shift-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--member-rotation-deg-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--los-amplitude-fraction-values", nargs="+", type=float, default=[0.0, 0.1, 0.2])
     calibrate.add_argument("--los-size-multiplier-values", nargs="+", type=float, default=[6.0, 8.0])
     calibrate.add_argument("--los-position-shrink-values", nargs="+", type=float, default=[0.4, 0.6])
@@ -1368,12 +1436,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=["inherit", "beta_model", "softened_nfw"],
         choices=["inherit", "gaussian", "beta_model", "softened_nfw"],
     )
+    calibrate.add_argument("--los-source-beta-values", nargs="*", type=float, default=[])
+    calibrate.add_argument("--los-source-outer-slope-values", nargs="*", type=float, default=[])
     calibrate.add_argument("--los-axis-ratio-values", nargs="+", type=float, default=[1.0])
     calibrate.add_argument("--los-angle-offset-deg-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--los-minimum-size-scale", type=float, default=2.0)
     calibrate.add_argument("--los-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0, 40.0, -40.0])
     calibrate.add_argument("--los-shift-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--los-split-parallel-arcsec-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--los-split-perpendicular-arcsec-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--auto-extent-padding-arcsec", type=float, default=80.0)
     calibrate.add_argument("--minimum-extent-arcsec", type=float, default=120.0)
     calibrate.add_argument(

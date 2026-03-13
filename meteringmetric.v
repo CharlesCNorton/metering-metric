@@ -783,6 +783,61 @@ Proof.
   lra.
 Qed.
 
+Theorem allowed_point_if_threshold_below_floor :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m E eps, 0 <= m -> E > 0 -> 0 <= eps ->
+  eps <= lapse f mu x ->
+  m / E <= eps ->
+  V_eff_massive (lapse f mu) m x <= E * E.
+Proof.
+  intros f mu Hf Hmu x m E eps Hm HE Heps Hfloor Hratio.
+  apply (allowed_region_nonstrict_massive f mu Hf Hmu x m E); [exact Hm | exact HE |].
+  lra.
+Qed.
+
+Theorem forbidden_point_requires_threshold_above_floor :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m E eps, 0 <= m -> E > 0 -> 0 <= eps ->
+  eps <= lapse f mu x ->
+  E * E < V_eff_massive (lapse f mu) m x ->
+  eps < m / E.
+Proof.
+  intros f mu Hf Hmu x m E eps Hm HE Heps Hfloor Hforbid.
+  assert (Hlap : 0 < lapse f mu x) by (apply lapse_pos; assumption).
+  unfold V_eff_massive, V_eff in Hforbid.
+  assert (Hsq : E ^ 2 * lapse f mu x ^ 2 < m ^ 2).
+  {
+    assert (Htmp : E * E < m ^ 2 * / (lapse f mu x * lapse f mu x)) by exact Hforbid.
+    field_simplify in Htmp.
+    - assert (Hlap2 : 0 < lapse f mu x ^ 2) by nra.
+      apply (Rmult_lt_compat_r (lapse f mu x ^ 2)) in Htmp; [|exact Hlap2].
+      replace (m ^ 2 / lapse f mu x ^ 2 * lapse f mu x ^ 2) with (m ^ 2) in Htmp.
+      2:{ field; nra. }
+      exact Htmp.
+    - nra.
+  }
+  assert (Hlin : E * lapse f mu x < m).
+  {
+    destruct (Rle_dec m (E * lapse f mu x)) as [Hcontra | Hlt].
+    - assert (Hsqcontra : m ^ 2 <= E ^ 2 * lapse f mu x ^ 2) by nra.
+      lra.
+    - lra.
+  }
+  assert (Hepslin : E * eps < m).
+  {
+    assert (Hmult : E * eps <= E * lapse f mu x).
+    { apply Rmult_le_compat_l; lra. }
+    lra.
+  }
+  apply (Rmult_lt_reg_r E).
+  - exact HE.
+  - replace (eps * E) with (E * eps) by ring.
+    replace ((m / E) * E) with m by (field; lra).
+    exact Hepslin.
+Qed.
+
 Theorem wkb_integral_diverges :
   forall f mu,
   ActivationProps f -> MeteringProps mu ->

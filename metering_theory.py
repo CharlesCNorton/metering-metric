@@ -125,6 +125,46 @@ class SpeciesProfileObservables:
     observables: MassiveModeObservables
 
 
+@dataclass(frozen=True)
+class PhysicalSpeciesKinematics:
+    species_name: str
+    rest_mass_eV: float
+    conserved_energy_eV: float
+
+    def mass_energy_ratio(self) -> float:
+        if self.rest_mass_eV < 0.0:
+            raise ValueError("rest_mass_eV must be nonnegative.")
+        if self.conserved_energy_eV <= 0.0:
+            raise ValueError("conserved_energy_eV must be positive.")
+        return float(self.rest_mass_eV / self.conserved_energy_eV)
+
+
+@dataclass(frozen=True)
+class TheoryNativeActivityDomain:
+    domain_name: str
+    screening_length_m: float
+    activity_density: float
+    path_length_m: float
+    alpha: float
+    closure_ratio: float
+    epsilon: float = 0.0
+    expansion_rate_s_inv: float = 0.0
+    tau_planck_multiples: float = 1.0
+
+
+@dataclass(frozen=True)
+class DomainSpeciesPrediction:
+    domain_name: str
+    species_name: str
+    bridge_conversion: float
+    closure_ratio: float
+    uniform_lapse: float
+    mass_energy_ratio: float
+    required_activity_density: float
+    excluded: bool
+    observables: MassiveModeObservables
+
+
 def tanh_lapse(mu: float | np.ndarray, alpha: float, epsilon: float = 0.0) -> float | np.ndarray:
     if epsilon < 0.0 or epsilon >= 1.0:
         raise ValueError("epsilon must lie in [0, 1).")
@@ -222,6 +262,39 @@ def required_theory_native_closure_ratio(
         expansion_rate_s_inv=expansion_rate_s_inv,
     )
     return float(required_conversion * (screening_length_m * screening_length_m) / (PLANCK_TIME * relaxation_factor))
+
+
+def bridge_conversion_from_theory_native_closure_ratio(
+    closure_ratio: float,
+    screening_length_m: float,
+    expansion_rate_s_inv: float = 0.0,
+    tau_planck_multiples: float = 1.0,
+) -> float:
+    if closure_ratio <= 0.0:
+        raise ValueError("closure_ratio must be positive.")
+    if screening_length_m <= 0.0:
+        raise ValueError("screening_length_m must be positive.")
+    if tau_planck_multiples <= 0.0:
+        raise ValueError("tau_planck_multiples must be positive.")
+    relaxation_factor = occupancy_relaxation_factor(
+        tau_p_s=tau_planck_multiples * PLANCK_TIME,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    return float(closure_ratio * PLANCK_TIME * relaxation_factor / (screening_length_m * screening_length_m))
+
+
+def required_screening_cell_occupancy_fraction(
+    required_conversion: float,
+    screening_length_m: float,
+    expansion_rate_s_inv: float = 0.0,
+    tau_planck_multiples: float = 1.0,
+) -> float:
+    return required_theory_native_closure_ratio(
+        required_conversion=required_conversion,
+        screening_length_m=screening_length_m,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+        tau_planck_multiples=tau_planck_multiples,
+    )
 
 
 def theory_native_transverse_multiple_for_unit_ratio(
@@ -705,6 +778,66 @@ def same_lapse_uniform_delay_seconds(
     return float(crossing_time - path_length_m / C)
 
 
+def same_lapse_uniform_wkb_action(
+    path_length_m: float,
+    lapse: float,
+    conserved_energy: float,
+    rest_mass: float = 1.0,
+) -> float:
+    if path_length_m < 0.0:
+        raise ValueError("path_length_m must be nonnegative.")
+    density = same_lapse_wkb_action_density(
+        lapse=np.asarray([lapse], dtype=float),
+        conserved_energy=conserved_energy,
+        rest_mass=rest_mass,
+    )[0]
+    return float(path_length_m * density)
+
+
+def same_lapse_uniform_observables(
+    path_length_m: float,
+    lapse: float,
+    conserved_energy: float,
+    rest_mass: float = 1.0,
+) -> MassiveModeObservables:
+    velocity = same_lapse_group_velocity(
+        lapse=np.asarray([lapse], dtype=float),
+        conserved_energy=conserved_energy,
+        rest_mass=rest_mass,
+    )[0]
+    turning_lapse = same_lapse_turning_lapse(
+        conserved_energy=conserved_energy,
+        rest_mass=rest_mass,
+    )
+    return MassiveModeObservables(
+        rest_mass=float(rest_mass),
+        conserved_energy=float(conserved_energy),
+        turning_lapse=float(turning_lapse),
+        minimum_lapse=float(lapse),
+        turning_point=0.0 if lapse < turning_lapse else None,
+        minimum_group_velocity=float(velocity),
+        mean_group_velocity=float(velocity),
+        crossing_time_s=same_lapse_uniform_crossing_time_seconds(
+            path_length_m=path_length_m,
+            lapse=lapse,
+            conserved_energy=conserved_energy,
+            rest_mass=rest_mass,
+        ),
+        delay_s=same_lapse_uniform_delay_seconds(
+            path_length_m=path_length_m,
+            lapse=lapse,
+            conserved_energy=conserved_energy,
+            rest_mass=rest_mass,
+        ),
+        wkb_action=same_lapse_uniform_wkb_action(
+            path_length_m=path_length_m,
+            lapse=lapse,
+            conserved_energy=conserved_energy,
+            rest_mass=rest_mass,
+        ),
+    )
+
+
 def same_lapse_profile_crossing_time_seconds(
     grid_m: np.ndarray,
     lapse: np.ndarray,
@@ -873,6 +1006,65 @@ def same_lapse_species_profile_observables(
             observables=observables,
         )
     return rows
+
+
+def theory_native_domain_species_prediction(
+    domain: TheoryNativeActivityDomain,
+    species: PhysicalSpeciesKinematics,
+) -> DomainSpeciesPrediction:
+    if domain.activity_density <= 0.0:
+        raise ValueError("activity_density must be positive.")
+    if domain.path_length_m < 0.0:
+        raise ValueError("path_length_m must be nonnegative.")
+    bridge_conversion = bridge_conversion_from_theory_native_closure_ratio(
+        closure_ratio=domain.closure_ratio,
+        screening_length_m=domain.screening_length_m,
+        expansion_rate_s_inv=domain.expansion_rate_s_inv,
+        tau_planck_multiples=domain.tau_planck_multiples,
+    )
+    screening_mass = 1.0 / domain.screening_length_m
+    uniform_lapse = uniform_lapse_from_activity(
+        activity_density=domain.activity_density,
+        alpha=domain.alpha,
+        screening_mass=screening_mass,
+        bridge_conversion=bridge_conversion,
+        epsilon=domain.epsilon,
+    )
+    observables = same_lapse_uniform_observables(
+        path_length_m=domain.path_length_m,
+        lapse=uniform_lapse,
+        conserved_energy=species.conserved_energy_eV,
+        rest_mass=species.rest_mass_eV,
+    )
+    required_activity_density = required_activity_density_for_turning(
+        conserved_energy=species.conserved_energy_eV,
+        rest_mass=species.rest_mass_eV,
+        alpha=domain.alpha,
+        screening_mass=screening_mass,
+        bridge_conversion=bridge_conversion,
+        epsilon=domain.epsilon,
+    )
+    return DomainSpeciesPrediction(
+        domain_name=domain.domain_name,
+        species_name=species.species_name,
+        bridge_conversion=float(bridge_conversion),
+        closure_ratio=float(domain.closure_ratio),
+        uniform_lapse=float(uniform_lapse),
+        mass_energy_ratio=float(species.mass_energy_ratio()),
+        required_activity_density=float(required_activity_density),
+        excluded=not math.isfinite(observables.crossing_time_s),
+        observables=observables,
+    )
+
+
+def theory_native_domain_species_predictions(
+    domain: TheoryNativeActivityDomain,
+    species_rows: dict[str, PhysicalSpeciesKinematics],
+) -> dict[str, DomainSpeciesPrediction]:
+    return {
+        str(name): theory_native_domain_species_prediction(domain=domain, species=species)
+        for name, species in species_rows.items()
+    }
 
 
 def dirichlet_schrodinger_matrix(grid: np.ndarray, potential: np.ndarray) -> np.ndarray:
