@@ -73,6 +73,43 @@ class TheoryNativeBridgeClosure:
 
 
 @dataclass(frozen=True)
+class RenormalizedSourceKernelClosure:
+    eta_j: float
+    tau_planck_multiples: float
+    transverse_screening_multiples: float
+    temporal_kernel_moment: float = 1.0
+    transverse_kernel_moment: float = 1.0
+    channel_multiplicity: float = 1.0
+
+    def collective_factor(self) -> float:
+        if self.temporal_kernel_moment <= 0.0:
+            raise ValueError("temporal_kernel_moment must be positive.")
+        if self.transverse_kernel_moment <= 0.0:
+            raise ValueError("transverse_kernel_moment must be positive.")
+        if self.channel_multiplicity <= 0.0:
+            raise ValueError("channel_multiplicity must be positive.")
+        return float(
+            self.temporal_kernel_moment
+            * self.transverse_kernel_moment
+            * self.channel_multiplicity
+        )
+
+    def dimensionless_closure_ratio(self) -> float:
+        if self.eta_j <= 0.0:
+            raise ValueError("eta_j must be positive.")
+        if self.tau_planck_multiples <= 0.0:
+            raise ValueError("tau_planck_multiples must be positive.")
+        if self.transverse_screening_multiples <= 0.0:
+            raise ValueError("transverse_screening_multiples must be positive.")
+        return float(
+            self.eta_j
+            * self.tau_planck_multiples
+            * self.collective_factor()
+            / (self.transverse_screening_multiples ** 2)
+        )
+
+
+@dataclass(frozen=True)
 class OccupancyRelaxationState:
     activity_density: float
     expansion_rate_s_inv: float
@@ -382,6 +419,45 @@ def theory_native_transverse_multiple_for_unit_ratio(
         tau_planck_multiples=tau_planck_multiples,
     )
     return float(math.sqrt(max(1.0 / ratio, 0.0)))
+
+
+def renormalized_kernel_closure_ratio(
+    eta_j: float,
+    tau_planck_multiples: float,
+    transverse_screening_multiples: float,
+    temporal_kernel_moment: float = 1.0,
+    transverse_kernel_moment: float = 1.0,
+    channel_multiplicity: float = 1.0,
+) -> float:
+    return RenormalizedSourceKernelClosure(
+        eta_j=eta_j,
+        tau_planck_multiples=tau_planck_multiples,
+        transverse_screening_multiples=transverse_screening_multiples,
+        temporal_kernel_moment=temporal_kernel_moment,
+        transverse_kernel_moment=transverse_kernel_moment,
+        channel_multiplicity=channel_multiplicity,
+    ).dimensionless_closure_ratio()
+
+
+def required_kernel_collective_factor(
+    closure_ratio: float,
+    eta_j: float = 1.0,
+    tau_planck_multiples: float = 1.0,
+    transverse_screening_multiples: float = 1.0,
+) -> float:
+    if closure_ratio <= 0.0:
+        raise ValueError("closure_ratio must be positive.")
+    if eta_j <= 0.0:
+        raise ValueError("eta_j must be positive.")
+    if tau_planck_multiples <= 0.0:
+        raise ValueError("tau_planck_multiples must be positive.")
+    if transverse_screening_multiples <= 0.0:
+        raise ValueError("transverse_screening_multiples must be positive.")
+    return float(
+        closure_ratio
+        * (transverse_screening_multiples ** 2)
+        / (eta_j * tau_planck_multiples)
+    )
 
 
 def required_eta_for_theory_native_closure(

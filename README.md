@@ -312,6 +312,40 @@ $$
 
 So the literal Planck-tick single-screening-cell picture is not a universal closure of the mainline. What survives is the covariant transport law together with a renormalized effective reduction represented by $\Xi_J$. The open bridge problem is now narrower and sharper: derive that renormalized reduction from the source sector itself, rather than treating it as a benchmark-matched constant.
 
+One explicit mainline realization of that renormalized reduction is to treat the static source as the coarse-grained image of the dynamic activity density through temporal and transverse source kernels rather than through a literal microscopic cell count. Writing schematically
+
+$$
+J(x)
+=
+\eta_J \frac{1}{L_\perp^2}
+\int d\tau\,K_\tau\!\left(\frac{\tau}{\tau_p}\right)
+\int d^2y_\perp\,K_\perp\!\left(\frac{|y_\perp|}{L_\perp}\right)
+R\!\left(x-\tau u-y_\perp\right),
+$$
+
+the homogeneous quasistatic limit reduces to
+
+$$
+\Xi_J
+=
+\eta_J \frac{\chi_\tau}{\chi_L^2}
+\mathcal{C}_\tau
+\mathcal{C}_\perp
+\mathcal{M}_{\mathrm{ch}},
+$$
+
+where $\mathcal{C}_\tau$, $\mathcal{C}_\perp$, and $\mathcal{M}_{\mathrm{ch}}$ are the dimensionless temporal, transverse, and effective-channel moments of the source reduction. In the minimal natural closure with $\eta_J = \chi_\tau = \chi_L = 1$, the current benchmark value therefore corresponds to a net kernel collective factor
+
+$$
+\mathcal{C}_\tau \mathcal{C}_\perp \mathcal{M}_{\mathrm{ch}}
+=
+\Xi_J
+\approx
+1.41 \times 10^{-2}.
+$$
+
+That is the current strict source-side reading of the bridge. The remaining unknown is no longer a dimensional bridge constant. It is the dimensionless kernel moment product carried by the source sector itself.
+
 The same bridge law now ties the three active domains together:
 
 $$
@@ -978,6 +1012,8 @@ The next structural probe is now pinned down too. A broader harmonic-modulated h
 
 The next exact comparison has now closed the transverse-miscentering question one level further. In [`theory_maps/hff-targeted-miscentering-highres.json`](./theory_maps/hff-targeted-miscentering-highres.json), the live branch was tested directly against nearby challengers built from physical member-frame and large-scale transverse offsets: `\pm 10` arcsec member-frame perpendicular shifts, a `20` arcsec member-frame parallel shift, `10` arcsec smooth-envelope perpendicular and parallel shifts, a `10` arcsec LOS perpendicular shift, a `20` arcsec perpendicular LOS split, and an anisotropic smooth-envelope shrink variant. At mid resolution some of those variants looked competitive enough to promote, but the `513^2` confirmation keeps the current baseline winner. The strongest challengers slightly improve narrow diagnostics such as aligned pixel Pearson, aligned pixel Spearman, or aligned member-score Spearman, but they lose on the full aligned objective. Numerically, the baseline branch remains ahead with aligned median objective `1.5138`, against `1.5123` for a `+10` arcsec smooth-envelope perpendicular shift, `1.5086` for a `+10` arcsec LOS perpendicular shift, and `1.4802` for a `20` arcsec member-frame parallel shift. So simple transverse physical miscentering is not the missing field-lock degree of freedom either.
 
+The same verdict now survives cluster-specific local refinement. In [`theory_maps/hff-cluster-specific-randomized-highres.json`](./theory_maps/hff-cluster-specific-randomized-highres.json), each cluster was given its own randomized local search around the live branch over member shifts, member rotation, smooth-envelope projected shape, smooth-envelope transverse offsets, LOS amplitude, LOS projected shape, and LOS transverse offsets. The high-resolution winner for both `Abell 370` and `RXC J2248 / Abell S1063` is still the baseline current-best branch rather than a cluster-specific local perturbation. So the field-level gap is not just a shared-parameter overconstraint on the two clusters. The remaining mismatch sits deeper than local cluster-specific retuning around the present branch.
+
 A direct global-strength sweep in [`theory_maps/hff-backreaction-scale-summary.json`](./theory_maps/hff-backreaction-scale-summary.json) then shows that the current reference normalization is already near the local optimum of the present scaffold: weakening or strengthening the overall Einstein backreaction does not open a cleaner field-level fit. More sharply still, the factorization audit in [`theory_maps/hff-backreaction-factorization-invariance.json`](./theory_maps/hff-backreaction-factorization-invariance.json) shows exact invariance of the 22-family comparison when the composite scale
 
 $$
@@ -1210,8 +1246,8 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Potential shape discrimination | 6-site hardware comparison complete; $1/N^2$ gives the best fit among tested shapes |
 | Metering field equation (PDE + stability) | Numerical study complete; stable in the tested setups |
 | Photon decoupling | Model consequence of the mass-term-only coupling |
-| 3+1D lensing observable | Flat control, Einstein-backreaction branch, and explicit photon-sector branch are computable; the direct photon branch is heavily constrained; the Einstein branch is the current mainline candidate; spherical cluster-style maps remain convergence-dominated; multi-component, HFF-member, and calibrated member-plus-envelope Einstein maps generate sign-changing residual morphology without raw negative convergence; the current best tested structural branch is a `+5 deg` member-frame rotation plus a `beta_model` smooth envelope (`\beta = 0.8`) together with the shifted elliptic LOS `beta_model` branch; simple principal-axis LOS splitting, simple rigid rotation alone, smooth-`beta_model` replacement alone, simple low-order harmonic halo modulation, and simple transverse miscentering probes do not beat that combined branch; pixelwise field matching remains weak |
-| Decoherence rate source criterion | Dynamic activity density $R = \sum n_i \gamma_{D,i}$ adopted; the static screened source is now written through an occupancy transport law $\nabla_a(Q u^a) = R - Q/\tau_p$ with $J = \eta_J Q/L_\perp^2$; the theory-native closure reduces this to the dimensionless ratio $\Xi_J = \eta_J \chi_\tau/\chi_L^2$ once $(\tau_p,L_\perp)=(\chi_\tau t_P,\chi_L \ell_s)$ is imposed; in the minimal natural reduction, $\Xi_J$ is the screening-cell occupancy fraction, with current benchmark value `1.41 x 10^-2`; exact slab work fixes the benchmark bridge scale; the current reference Einstein source amplitude `10^{-3}` corresponds to bridge-side activity scale `R \approx 5.26 \times 10^{28}\ \mathrm{m}^{-3}\mathrm{s}^{-1}` at that benchmark bridge; the new cross-domain audit rules out a universal literal one-cell Planck-tick closure, so the surviving bridge problem is a renormalized effective reduction rather than a raw microscopic cell count; the current Einstein lensing scaffold still fixes only the composite backreaction scale $\texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2`, but the calibration tool now accepts bridge-derived source amplitudes from either absolute bridge conversion or reference-to-target activity ratios |
+| 3+1D lensing observable | Flat control, Einstein-backreaction branch, and explicit photon-sector branch are computable; the direct photon branch is heavily constrained; the Einstein branch is the current mainline candidate; spherical cluster-style maps remain convergence-dominated; multi-component, HFF-member, and calibrated member-plus-envelope Einstein maps generate sign-changing residual morphology without raw negative convergence; the current best tested structural branch is a `+5 deg` member-frame rotation plus a `beta_model` smooth envelope (`\beta = 0.8`) together with the shifted elliptic LOS `beta_model` branch; simple principal-axis LOS splitting, simple rigid rotation alone, smooth-`beta_model` replacement alone, simple low-order harmonic halo modulation, simple transverse miscentering probes, and cluster-specific local retuning around that branch do not beat it; pixelwise field matching remains weak |
+| Decoherence rate source criterion | Dynamic activity density $R = \sum n_i \gamma_{D,i}$ adopted; the static screened source is now written through an occupancy transport law $\nabla_a(Q u^a) = R - Q/\tau_p$ with $J = \eta_J Q/L_\perp^2$; the theory-native closure reduces this to the dimensionless ratio $\Xi_J = \eta_J \chi_\tau/\chi_L^2$ once $(\tau_p,L_\perp)=(\chi_\tau t_P,\chi_L \ell_s)$ is imposed; in the minimal natural reduction, $\Xi_J$ is the screening-cell occupancy fraction, with current benchmark value `1.41 x 10^-2`; exact slab work fixes the benchmark bridge scale; the current reference Einstein source amplitude `10^{-3}` corresponds to bridge-side activity scale `R \approx 5.26 \times 10^{28}\ \mathrm{m}^{-3}\mathrm{s}^{-1}` at that benchmark bridge; the new cross-domain audit rules out a universal literal one-cell Planck-tick closure, so the surviving bridge problem is a renormalized effective reduction rather than a raw microscopic cell count; in the explicit kernel reading, that reduction is the source-sector moment product `\mathcal{C}_\tau \mathcal{C}_\perp \mathcal{M}_{\mathrm{ch}}`; the current Einstein lensing scaffold still fixes only the composite backreaction scale $\texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2`, but the calibration tool now accepts bridge-derived source amplitudes from either absolute bridge conversion or reference-to-target activity ratios |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
 | Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; the public-data proxy lane is exhausted without a replicated abundance-style signal; active focus shifts to the 3+1D lensing derivation |
 | Coq formalization | Abstract theorem spine compiles; admissible-path and integral bounds, massive-threshold results, mass- and energy-hierarchy monotonicity, and local/interval regularized-floor theorems are formalized in the monolithic file |
