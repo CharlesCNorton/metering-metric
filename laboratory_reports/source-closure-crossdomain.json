@@ -1,0 +1,35 @@
+{
+  "closure_ratio_xi_j": 0.014099827070083516,
+  "domains": [
+    {
+      "domain_name": "lab_benchmark_0p2um",
+      "activity_density_m3_s": 1e+40,
+      "screening_length_m": 2e-07,
+      "planck_tick_s": 5.391246446661944e-44,
+      "naive_screening_cell_occupancy_fraction": 4.3129971573295544e-24,
+      "target_closure_ratio_xi_j": 0.014099827070083516,
+      "closure_to_naive_ratio": 3.269148240944726e+21,
+      "naive_model_oversaturated": false
+    },
+    {
+      "domain_name": "lensing_reference_source_on_lab_bridge",
+      "activity_density_m3_s": 5.262074835790534e+28,
+      "screening_length_m": 2e-07,
+      "planck_tick_s": 5.391246446661944e-44,
+      "naive_screening_cell_occupancy_fraction": 2.2695313808419958e-35,
+      "target_closure_ratio_xi_j": 0.014099827070083516,
+      "closure_to_naive_ratio": 6.2126601064456236e+32,
+      "naive_model_oversaturated": false
+    },
+    {
+      "domain_name": "void_reference_1mpc",
+      "activity_density_m3_s": 1e-21,
+      "screening_length_m": 3.085677581491367e+22,
+      "planck_tick_s": 5.391246446661944e-44,
+      "naive_screening_cell_occupancy_fraction": 1583.9476378438465,
+      "target_closure_ratio_xi_j": 0.014099827070083516,
+      "closure_to_naive_ratio": 8.901700241352011e-06,
+      "naive_model_oversaturated": true
+    }
+  ]
+}

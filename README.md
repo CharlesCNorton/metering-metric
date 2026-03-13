@@ -272,6 +272,46 @@ therefore reads as an occupancy fraction of about `1.4%` per natural screening c
 
 That is the current strict mainline reading of the bridge problem. The theory no longer needs to determine three unrelated dimensional inputs. It needs to determine the dimensionless closure ratio $\Xi_J$ and the circumstances under which the natural-scale identification $(\tau_p,L_\perp) = (\chi_\tau t_P,\chi_L \ell_s)$ is correct.
 
+The new cross-domain audit in [`laboratory_reports/source-closure-crossdomain.json`](./laboratory_reports/source-closure-crossdomain.json) now shows exactly where the literal one-cell reading breaks. If one takes the Planck-tick screening-cell picture at face value and computes the naive occupied-cell fraction
+
+$$
+f_{\mathrm{cell}} \sim R\,t_P\,\ell_s^3,
+$$
+
+then at the laboratory benchmark point `R_{\mathrm{lab}} \sim 10^{40}\ \mathrm{m^{-3}s^{-1}}` with `\ell_s = 0.2\,\mu\mathrm{m}` one gets only
+
+$$
+f_{\mathrm{cell,lab}} \approx 4.31 \times 10^{-24},
+$$
+
+so matching the current benchmark closure ratio would require a collective enhancement
+
+$$
+\Xi_J / f_{\mathrm{cell,lab}} \approx 3.27 \times 10^{21}.
+$$
+
+At the current lensing reference source amplitude `10^{-3}` on that same bridge, the implied activity scale `R \approx 5.26 \times 10^{28}\ \mathrm{m^{-3}s^{-1}}` gives
+
+$$
+f_{\mathrm{cell,lensing}} \approx 2.27 \times 10^{-35},
+$$
+
+so the required enhancement rises to
+
+$$
+\Xi_J / f_{\mathrm{cell,lensing}} \approx 6.21 \times 10^{32}.
+$$
+
+But in the `1 Mpc` reference-void branch with `R_{\mathrm{void}} \sim 10^{-21}\ \mathrm{m^{-3}s^{-1}}`, the same literal rule oversaturates:
+
+$$
+f_{\mathrm{cell,void}} \approx 1.58 \times 10^3,
+\qquad
+\Xi_J / f_{\mathrm{cell,void}} \approx 8.90 \times 10^{-6}.
+$$
+
+So the literal Planck-tick single-screening-cell picture is not a universal closure of the mainline. What survives is the covariant transport law together with a renormalized effective reduction represented by $\Xi_J$. The open bridge problem is now narrower and sharper: derive that renormalized reduction from the source sector itself, rather than treating it as a benchmark-matched constant.
+
 The same bridge law now ties the three active domains together:
 
 $$
@@ -820,6 +860,20 @@ On that reference branch:
 
 Those are not full inhomogeneous cosmological transport solutions; they are uniform-domain benchmarks derived from the same occupancy bridge and same-lapse dispersion law. But they already turn the species hierarchy into concrete domain-scale numbers rather than a qualitative slogan.
 
+The same workbench now carries data-anchored messenger windows in [`laboratory_reports/messenger-activity-windows.json`](./laboratory_reports/messenger-activity-windows.json). Three current anchor cases are:
+
+- an `OPERA/CNGS`-like `17 GeV` muon-neutrino messenger over `730 km` with a `10 ns` timing cap
+- an `SN1987A`-like `10 MeV` neutrino messenger over `51.4 kpc` with a conservative `3 h` cap
+- an `IceCube-170922A`-like `290 TeV` neutrino messenger over `1.75 Gpc` with a loose `1.6 x 10^7 s` association window
+
+Under the present laboratory bound and regularized floor, all three sit in the same regime: the delay-cap-required lapse is already below $\epsilon = 10^{-2}$, so the current branch is trivially safe for these neutrino messengers. Numerically:
+
+- `OPERA/CNGS`-like case: required lapse `1.03 x 10^{-9}`, present lab branch delay `0`
+- `SN1987A`-like case: required lapse `7.83 x 10^{-5}`, present reference-void delay `0.661 s`
+- `IceCube-170922A`-like case: required lapse `1.29 x 10^{-11}`, present reference-void delay `0`
+
+That is a useful sharpening. Under the current `\alpha` bound and regularized floor, neutrino messengers are not the hard constraint channel. The nontrivial messenger sector remains heavier massive modes, not ultra-relativistic neutrinos.
+
 Selected predictions for a 120 Mpc void:
 
 | $m$ (Mpc$^{-1}$) | $\alpha$ | $N_{\text{void}}$ | Delay |
@@ -919,6 +973,10 @@ The first branch that actually survives those pieces in combination is now expli
 - member-pass agreement: `0.8932` to `0.8894`
 
 So the lensing mainline moved again. The missing degree of freedom is not simple LOS splitting, not simple rotation alone, and not smooth-halo family alone. But the combination of a mild physical miscentering rotation with the richer smooth-halo family does produce a stronger field-level comparison. Pixelwise lock is still weak, yet the current best branch now improves both overlap structure and member-level ordering without sacrificing the full aligned objective.
+
+The next structural probe is now pinned down too. A broader harmonic-modulated halo search in [`theory_maps/hff-harmonic-variant-highres.json`](./theory_maps/hff-harmonic-variant-highres.json) found a non-mainline branch with smooth-envelope quadrupole modulation `m2 = 0.3` and phase offset `15 deg` that can raise aligned pixel Pearson to about `2.27 x 10^{-3}`, but it loses sharply on the full aligned objective (`1.4245`) and on harmonic mismatch. A direct follow-up on top of the current best branch in [`theory_maps/hff-targeted-harmonic-midres.json`](./theory_maps/hff-targeted-harmonic-midres.json) keeps the baseline winner: adding smooth-envelope quadrupole modulation with `m2 = 0.15` or `0.30` lowers the aligned median objective from `1.4927` to `1.4283` or `1.4342`. So simple low-order angular modulation is not the missing field-lock degree of freedom either.
+
+The next exact comparison has now closed the transverse-miscentering question one level further. In [`theory_maps/hff-targeted-miscentering-highres.json`](./theory_maps/hff-targeted-miscentering-highres.json), the live branch was tested directly against nearby challengers built from physical member-frame and large-scale transverse offsets: `\pm 10` arcsec member-frame perpendicular shifts, a `20` arcsec member-frame parallel shift, `10` arcsec smooth-envelope perpendicular and parallel shifts, a `10` arcsec LOS perpendicular shift, a `20` arcsec perpendicular LOS split, and an anisotropic smooth-envelope shrink variant. At mid resolution some of those variants looked competitive enough to promote, but the `513^2` confirmation keeps the current baseline winner. The strongest challengers slightly improve narrow diagnostics such as aligned pixel Pearson, aligned pixel Spearman, or aligned member-score Spearman, but they lose on the full aligned objective. Numerically, the baseline branch remains ahead with aligned median objective `1.5138`, against `1.5123` for a `+10` arcsec smooth-envelope perpendicular shift, `1.5086` for a `+10` arcsec LOS perpendicular shift, and `1.4802` for a `20` arcsec member-frame parallel shift. So simple transverse physical miscentering is not the missing field-lock degree of freedom either.
 
 A direct global-strength sweep in [`theory_maps/hff-backreaction-scale-summary.json`](./theory_maps/hff-backreaction-scale-summary.json) then shows that the current reference normalization is already near the local optimum of the present scaffold: weakening or strengthening the overall Einstein backreaction does not open a cleaner field-level fit. More sharply still, the factorization audit in [`theory_maps/hff-backreaction-factorization-invariance.json`](./theory_maps/hff-backreaction-factorization-invariance.json) shows exact invariance of the 22-family comparison when the composite scale
 
@@ -1152,11 +1210,11 @@ Simulator results span two orders of magnitude in lattice resolution (6 to 1000 
 | Potential shape discrimination | 6-site hardware comparison complete; $1/N^2$ gives the best fit among tested shapes |
 | Metering field equation (PDE + stability) | Numerical study complete; stable in the tested setups |
 | Photon decoupling | Model consequence of the mass-term-only coupling |
-| 3+1D lensing observable | Flat control, Einstein-backreaction branch, and explicit photon-sector branch are computable; the direct photon branch is heavily constrained; the Einstein branch is the current mainline candidate; spherical cluster-style maps remain convergence-dominated; multi-component, HFF-member, and calibrated member-plus-envelope Einstein maps generate sign-changing residual morphology without raw negative convergence; the current best tested structural branch is a `+5 deg` member-frame rotation plus a `beta_model` smooth envelope (`\beta = 0.8`) together with the shifted elliptic LOS `beta_model` branch; simple principal-axis LOS splitting, simple rigid rotation alone, and smooth-`beta_model` replacement alone do not beat that combined branch; pixelwise field matching remains weak |
-| Decoherence rate source criterion | Dynamic activity density $R = \sum n_i \gamma_{D,i}$ adopted; the static screened source is now written through an occupancy transport law $\nabla_a(Q u^a) = R - Q/\tau_p$ with $J = \eta_J Q/L_\perp^2$; the theory-native closure reduces this to the dimensionless ratio $\Xi_J = \eta_J \chi_\tau/\chi_L^2$ once $(\tau_p,L_\perp)=(\chi_\tau t_P,\chi_L \ell_s)$ is imposed; in the minimal natural reduction, $\Xi_J$ is the screening-cell occupancy fraction, with current benchmark value `1.41 x 10^-2`; exact slab work fixes the benchmark bridge scale; the current reference Einstein source amplitude `10^{-3}` corresponds to bridge-side activity scale `R \approx 5.26 \times 10^{28}\ \mathrm{m}^{-3}\mathrm{s}^{-1}` at that benchmark bridge; the current Einstein lensing scaffold still fixes only the composite backreaction scale $\texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2$, but the calibration tool now accepts bridge-derived source amplitudes from either absolute bridge conversion or reference-to-target activity ratios |
+| 3+1D lensing observable | Flat control, Einstein-backreaction branch, and explicit photon-sector branch are computable; the direct photon branch is heavily constrained; the Einstein branch is the current mainline candidate; spherical cluster-style maps remain convergence-dominated; multi-component, HFF-member, and calibrated member-plus-envelope Einstein maps generate sign-changing residual morphology without raw negative convergence; the current best tested structural branch is a `+5 deg` member-frame rotation plus a `beta_model` smooth envelope (`\beta = 0.8`) together with the shifted elliptic LOS `beta_model` branch; simple principal-axis LOS splitting, simple rigid rotation alone, smooth-`beta_model` replacement alone, simple low-order harmonic halo modulation, and simple transverse miscentering probes do not beat that combined branch; pixelwise field matching remains weak |
+| Decoherence rate source criterion | Dynamic activity density $R = \sum n_i \gamma_{D,i}$ adopted; the static screened source is now written through an occupancy transport law $\nabla_a(Q u^a) = R - Q/\tau_p$ with $J = \eta_J Q/L_\perp^2$; the theory-native closure reduces this to the dimensionless ratio $\Xi_J = \eta_J \chi_\tau/\chi_L^2$ once $(\tau_p,L_\perp)=(\chi_\tau t_P,\chi_L \ell_s)$ is imposed; in the minimal natural reduction, $\Xi_J$ is the screening-cell occupancy fraction, with current benchmark value `1.41 x 10^-2`; exact slab work fixes the benchmark bridge scale; the current reference Einstein source amplitude `10^{-3}` corresponds to bridge-side activity scale `R \approx 5.26 \times 10^{28}\ \mathrm{m}^{-3}\mathrm{s}^{-1}` at that benchmark bridge; the new cross-domain audit rules out a universal literal one-cell Planck-tick closure, so the surviving bridge problem is a renormalized effective reduction rather than a raw microscopic cell count; the current Einstein lensing scaffold still fixes only the composite backreaction scale $\texttt{gravity\_scale}\,\texttt{density\_scale}\,\texttt{source\_amplitude}^2`, but the calibration tool now accepts bridge-derived source amplitudes from either absolute bridge conversion or reference-to-target activity ratios |
 | Void metering + cosmological predictions | Numerical parameter study complete; observational status open |
 | Archival lensing program (2 clusters, 22 model families, BUFFALO + MUSE + deeper external spectroscopy + public MUSE-DEEP core cubes) | Morphology replicated under the hardened residual; local convergence and mass remain stable; the public-data proxy lane is exhausted without a replicated abundance-style signal; active focus shifts to the 3+1D lensing derivation |
-| Coq formalization | Abstract theorem spine compiles; admissible-path bounds, massive-threshold results, mass- and energy-hierarchy monotonicity, and local regularized-floor theorems are formalized in the monolithic file |
+| Coq formalization | Abstract theorem spine compiles; admissible-path and integral bounds, massive-threshold results, mass- and energy-hierarchy monotonicity, and local/interval regularized-floor theorems are formalized in the monolithic file |
 | Physical $\alpha$ laboratory program | Casimir benchmark null executed; strongest current benchmark cutoff $\alpha \leq 6.79 \times 10^{-3}$; active-vs-inert differential target, exact planar slab law, and first viable occupancy bridge family defined; remaining blocker is fixing $(\eta_J, \tau_p, L_\perp)$ covariantly; direct first-principles measurement remains open |
 
 ---

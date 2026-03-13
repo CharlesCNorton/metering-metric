@@ -368,6 +368,43 @@ Proof.
   nra.
 Qed.
 
+Theorem proper_time_integral_nonneg_admissible :
+  forall (f : R -> R) (mu gamma v : R -> R) (t1 t2 : R),
+  t1 <= t2 ->
+  ex_RInt (fun t => proper_time_density_path f mu gamma v t) t1 t2 ->
+  (forall t, t1 <= t <= t2 -> 0 <= v t <= lapse f mu (gamma t)) ->
+  0 <= RInt (fun t => proper_time_density_path f mu gamma v t) t1 t2.
+Proof.
+  intros f mu gamma v t1 t2 Hle Hex Hadm.
+  apply RInt_ge_0.
+  - exact Hle.
+  - exact Hex.
+  - intros t Ht.
+    apply proper_time_density_path_nonneg_admissible.
+    apply Hadm.
+    lra.
+Qed.
+
+Theorem proper_time_integral_le_lapse_integral_admissible :
+  forall (f : R -> R) (mu gamma v : R -> R) (t1 t2 : R),
+  t1 <= t2 ->
+  ex_RInt (fun t => proper_time_density_path f mu gamma v t) t1 t2 ->
+  ex_RInt (fun t => lapse f mu (gamma t)) t1 t2 ->
+  (forall t, t1 <= t <= t2 -> 0 <= v t <= lapse f mu (gamma t)) ->
+  RInt (fun t => proper_time_density_path f mu gamma v t) t1 t2
+    <= RInt (fun t => lapse f mu (gamma t)) t1 t2.
+Proof.
+  intros f mu gamma v t1 t2 Hle Hex1 Hex2 Hadm.
+  apply RInt_le.
+  - exact Hle.
+  - exact Hex1.
+  - exact Hex2.
+  - intros t Ht.
+    apply proper_time_density_path_le_lapse_admissible.
+    apply Hadm.
+    lra.
+Qed.
+
 (**
   Scope note: the proper-time theorem family here treats static observers and
   admissible prescribed paths supported entirely in meterless regions. It
@@ -836,6 +873,34 @@ Proof.
   - replace (eps * E) with (E * eps) by ring.
     replace ((m / E) * E) with m by (field; lra).
     exact Hepslin.
+Qed.
+
+Theorem allowed_interval_if_threshold_below_floor :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall gamma t1 t2 m E eps,
+  0 <= m -> E > 0 -> 0 <= eps ->
+  (forall t, t1 <= t <= t2 -> eps <= lapse f mu (gamma t)) ->
+  m / E <= eps ->
+  forall t, t1 <= t <= t2 -> V_eff_massive (lapse f mu) m (gamma t) <= E * E.
+Proof.
+  intros f mu Hf Hmu gamma t1 t2 m E eps Hm HE Heps Hfloor Hratio t Ht.
+  apply (allowed_point_if_threshold_below_floor f mu Hf Hmu (gamma t) m E eps); try assumption.
+  apply Hfloor; exact Ht.
+Qed.
+
+Theorem forbidden_interval_requires_threshold_above_floor :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall gamma t1 t2 m E eps,
+  0 <= m -> E > 0 -> 0 <= eps ->
+  (forall t, t1 <= t <= t2 -> eps <= lapse f mu (gamma t)) ->
+  (exists t, t1 <= t <= t2 /\ E * E < V_eff_massive (lapse f mu) m (gamma t)) ->
+  eps < m / E.
+Proof.
+  intros f mu Hf Hmu gamma t1 t2 m E eps Hm HE Heps Hfloor [t [Ht Hforbid]].
+  apply (forbidden_point_requires_threshold_above_floor f mu Hf Hmu (gamma t) m E eps); try assumption.
+  apply Hfloor; exact Ht.
 Qed.
 
 Theorem wkb_integral_diverges :

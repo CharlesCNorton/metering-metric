@@ -1,0 +1,61 @@
+{
+  "closure_ratio_xi_j": 0.014099827070083516,
+  "alpha": 0.00679,
+  "epsilon": 0.01,
+  "cases": {
+    "opera_cngs_nu_mu": {
+      "case_name": "opera_cngs_nu_mu",
+      "domain_name": "laboratory_benchmark",
+      "bridge_conversion": 1.9003910647533915e-32,
+      "closure_ratio": 0.014099827070083516,
+      "uniform_lapse": 0.010000051098475106,
+      "current_delay_s": 0.0,
+      "turning_activity_density_m3_s": Infinity,
+      "minimum_activity_density_for_delay_cap_m3_s": 0.0,
+      "delay_cap_required_lapse": 1.026262597960937e-09,
+      "naive_screening_cell_occupancy_fraction": 4.3129971573295544e-24,
+      "required_collective_enhancement": 3.269148240944726e+21,
+      "exclusion_avoided": true,
+      "delay_cap_satisfied": true,
+      "rest_mass_eV": 0.05,
+      "conserved_energy_eV": 17000000000.0,
+      "turning_lapse": 2.9411764705882356e-12
+    },
+    "sn1987a_nu_e_bar": {
+      "case_name": "sn1987a_nu_e_bar",
+      "domain_name": "reference_void",
+      "bridge_conversion": 7.983657192753462e-91,
+      "closure_ratio": 0.014099827070083516,
+      "uniform_lapse": 0.01,
+      "current_delay_s": 0.6611328125,
+      "turning_activity_density_m3_s": Infinity,
+      "minimum_activity_density_for_delay_cap_m3_s": 0.0,
+      "delay_cap_required_lapse": 7.82509487060205e-05,
+      "naive_screening_cell_occupancy_fraction": 1583.9476378438465,
+      "required_collective_enhancement": 8.901700241352011e-06,
+      "exclusion_avoided": true,
+      "delay_cap_satisfied": true,
+      "rest_mass_eV": 0.05,
+      "conserved_energy_eV": 10000000.0,
+      "turning_lapse": 5e-09
+    },
+    "icecube_170922a_like_nu": {
+      "case_name": "icecube_170922a_like_nu",
+      "domain_name": "reference_void",
+      "bridge_conversion": 7.983657192753462e-91,
+      "closure_ratio": 0.014099827070083516,
+      "uniform_lapse": 0.01,
+      "current_delay_s": 0.0,
+      "turning_activity_density_m3_s": Infinity,
+      "minimum_activity_density_for_delay_cap_m3_s": 0.0,
+      "delay_cap_required_lapse": 1.2935429224838234e-11,
+      "naive_screening_cell_occupancy_fraction": 1583.9476378438465,
+      "required_collective_enhancement": 8.901700241352011e-06,
+      "exclusion_avoided": true,
+      "delay_cap_satisfied": true,
+      "rest_mass_eV": 0.05,
+      "conserved_energy_eV": 290000000000000.0,
+      "turning_lapse": 1.7241379310344828e-16
+    }
+  }
+}

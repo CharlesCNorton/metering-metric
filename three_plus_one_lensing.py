@@ -934,6 +934,21 @@ def component_projected_radius_and_phi(dx: np.ndarray, dy: np.ndarray, spec: dic
     return radius, phi
 
 
+def component_angular_modulation(phi: np.ndarray, spec: dict) -> np.ndarray:
+    phase_deg = float(spec.get("harmonic_phase_deg", 0.0))
+    phase = math.radians(phase_deg)
+    amplitude_m1 = float(spec.get("harmonic_m1", 0.0))
+    amplitude_m2 = float(spec.get("harmonic_m2", 0.0))
+    amplitude_m3 = float(spec.get("harmonic_m3", 0.0))
+    modulation = (
+        1.0
+        + amplitude_m1 * np.cos(phi - phase)
+        + amplitude_m2 * np.cos(2.0 * (phi - phase))
+        + amplitude_m3 * np.cos(3.0 * (phi - phase))
+    )
+    return np.maximum(modulation, 0.05)
+
+
 def component_weight(spec: dict) -> float:
     return float(spec.get("weight", spec.get("amplitude_scale", 1.0)))
 
@@ -1312,8 +1327,11 @@ def build_multicomponent_lensing_map(
         dx = x_grid - float(payload["spec"]["center_x"])
         dy = y_grid - float(payload["spec"]["center_y"])
         radius, phi = component_projected_radius_and_phi(dx=dx, dy=dy, spec=payload["spec"])
+        angular_modulation = component_angular_modulation(phi=phi, spec=payload["spec"])
         kappa_local = interpolate_radial_field(impacts, convergence, radius)
         gamma_t_local = interpolate_radial_field(impacts, shear_tangential, radius)
+        kappa_local = kappa_local * angular_modulation
+        gamma_t_local = gamma_t_local * angular_modulation
         gamma1_local = -gamma_t_local * np.cos(2.0 * phi)
         gamma2_local = -gamma_t_local * np.sin(2.0 * phi)
         kappa_total += kappa_local

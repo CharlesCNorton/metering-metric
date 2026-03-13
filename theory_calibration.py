@@ -210,6 +210,10 @@ def build_shifted_background_component_specs(
     source_kind: str | None,
     source_beta: float | None,
     source_outer_slope: float | None,
+    harmonic_m1: float,
+    harmonic_m2: float,
+    harmonic_m3: float,
+    harmonic_phase_deg: float,
     shift_x_arcsec: float,
     shift_y_arcsec: float,
     layer_name: str,
@@ -241,6 +245,10 @@ def build_shifted_background_component_specs(
             "axis_ratio": float(axis_ratio),
             "orientation_deg": float(principal_axis_deg + angle_offset_deg),
             "layer": layer_name,
+            "harmonic_m1": float(harmonic_m1),
+            "harmonic_m2": float(harmonic_m2),
+            "harmonic_m3": float(harmonic_m3),
+            "harmonic_phase_deg": float(principal_axis_deg + harmonic_phase_deg),
         }
         if source_kind is not None:
             row["source_kind"] = source_kind
@@ -367,6 +375,10 @@ def build_theory_component_specs(
     smooth_background_source_kind: str | None,
     smooth_background_source_beta: float | None,
     smooth_background_source_outer_slope: float | None,
+    smooth_background_harmonic_m1: float,
+    smooth_background_harmonic_m2: float,
+    smooth_background_harmonic_m3: float,
+    smooth_background_harmonic_phase_deg: float,
     smooth_background_axis_ratio: float | None,
     smooth_background_angle_offset_deg: float,
     smooth_background_shift_parallel_arcsec: float,
@@ -382,6 +394,10 @@ def build_theory_component_specs(
     los_source_kind: str | None,
     los_source_beta: float | None,
     los_source_outer_slope: float | None,
+    los_harmonic_m1: float,
+    los_harmonic_m2: float,
+    los_harmonic_m3: float,
+    los_harmonic_phase_deg: float,
     los_axis_ratio: float | None,
     los_angle_offset_deg: float,
     los_shift_parallel_arcsec: float,
@@ -443,6 +459,10 @@ def build_theory_component_specs(
                 source_kind=smooth_background_source_kind,
                 source_beta=smooth_background_source_beta,
                 source_outer_slope=smooth_background_source_outer_slope,
+                harmonic_m1=smooth_background_harmonic_m1,
+                harmonic_m2=smooth_background_harmonic_m2,
+                harmonic_m3=smooth_background_harmonic_m3,
+                harmonic_phase_deg=smooth_background_harmonic_phase_deg,
                 shift_x_arcsec=smooth_background_shift_x + split_x,
                 shift_y_arcsec=smooth_background_shift_y + split_y,
                 layer_name="smooth_background",
@@ -476,6 +496,10 @@ def build_theory_component_specs(
                 source_kind=los_source_kind,
                 source_beta=los_source_beta,
                 source_outer_slope=los_source_outer_slope,
+                harmonic_m1=los_harmonic_m1,
+                harmonic_m2=los_harmonic_m2,
+                harmonic_m3=los_harmonic_m3,
+                harmonic_phase_deg=los_harmonic_phase_deg,
                 shift_x_arcsec=los_shift_x + split_x,
                 shift_y_arcsec=los_shift_y + split_y,
                 layer_name="line_of_sight",
@@ -507,6 +531,10 @@ def build_theory_component_specs(
         "smooth_background_source_kind": smooth_background_source_kind or "inherit",
         "smooth_background_source_beta": None if smooth_background_source_beta is None else float(smooth_background_source_beta),
         "smooth_background_source_outer_slope": None if smooth_background_source_outer_slope is None else float(smooth_background_source_outer_slope),
+        "smooth_background_harmonic_m1": float(smooth_background_harmonic_m1),
+        "smooth_background_harmonic_m2": float(smooth_background_harmonic_m2),
+        "smooth_background_harmonic_m3": float(smooth_background_harmonic_m3),
+        "smooth_background_harmonic_phase_deg": float(smooth_background_harmonic_phase_deg),
         "line_of_sight_shift_x_arcsec": float(los_shift_x),
         "line_of_sight_shift_y_arcsec": float(los_shift_y),
         "line_of_sight_split_parallel_arcsec": float(los_split_parallel_arcsec),
@@ -522,6 +550,10 @@ def build_theory_component_specs(
         "line_of_sight_source_kind": los_source_kind or "inherit",
         "line_of_sight_source_beta": None if los_source_beta is None else float(los_source_beta),
         "line_of_sight_source_outer_slope": None if los_source_outer_slope is None else float(los_source_outer_slope),
+        "line_of_sight_harmonic_m1": float(los_harmonic_m1),
+        "line_of_sight_harmonic_m2": float(los_harmonic_m2),
+        "line_of_sight_harmonic_m3": float(los_harmonic_m3),
+        "line_of_sight_harmonic_phase_deg": float(los_harmonic_phase_deg),
         "member_component_count": int(len(shifted_member_specs)),
         "smooth_background_component_count": int(len(smooth_background_specs)),
         "line_of_sight_component_count": int(len(los_specs)),
@@ -720,6 +752,10 @@ def execute_search(
                 smooth_background_source_kind=resolve_optional_source_kind(combo.get("smooth_background_source_kind", None)),
                 smooth_background_source_beta=resolve_optional_float(combo, "smooth_background_source_beta"),
                 smooth_background_source_outer_slope=resolve_optional_float(combo, "smooth_background_source_outer_slope"),
+                smooth_background_harmonic_m1=float(combo.get("smooth_background_harmonic_m1", 0.0)),
+                smooth_background_harmonic_m2=float(combo.get("smooth_background_harmonic_m2", 0.0)),
+                smooth_background_harmonic_m3=float(combo.get("smooth_background_harmonic_m3", 0.0)),
+                smooth_background_harmonic_phase_deg=float(combo.get("smooth_background_harmonic_phase_deg", 0.0)),
                 smooth_background_axis_ratio=float(combo.get("smooth_background_axis_ratio", 1.0)),
                 smooth_background_angle_offset_deg=float(combo.get("smooth_background_angle_offset_deg", 0.0)),
                 smooth_background_shift_parallel_arcsec=0.0,
@@ -735,6 +771,10 @@ def execute_search(
                 los_source_kind=None,
                 los_source_beta=None,
                 los_source_outer_slope=None,
+                los_harmonic_m1=0.0,
+                los_harmonic_m2=0.0,
+                los_harmonic_m3=0.0,
+                los_harmonic_phase_deg=0.0,
                 los_axis_ratio=1.0,
                 los_angle_offset_deg=0.0,
                 los_shift_parallel_arcsec=0.0,
@@ -828,6 +868,12 @@ def execute_search(
                         parameters,
                         "smooth_background_source_outer_slope",
                     ),
+                    smooth_background_harmonic_m1=float(parameters.get("smooth_background_harmonic_m1", 0.0)),
+                    smooth_background_harmonic_m2=float(parameters.get("smooth_background_harmonic_m2", 0.0)),
+                    smooth_background_harmonic_m3=float(parameters.get("smooth_background_harmonic_m3", 0.0)),
+                    smooth_background_harmonic_phase_deg=float(
+                        parameters.get("smooth_background_harmonic_phase_deg", 0.0)
+                    ),
                     smooth_background_axis_ratio=float(parameters.get("smooth_background_axis_ratio", 1.0)),
                     smooth_background_angle_offset_deg=float(parameters.get("smooth_background_angle_offset_deg", 0.0)),
                     smooth_background_shift_parallel_arcsec=float(parameters["smooth_background_shift_parallel_arcsec"]),
@@ -851,6 +897,10 @@ def execute_search(
                     los_source_kind=resolve_optional_source_kind(parameters.get("los_source_kind", None)),
                     los_source_beta=resolve_optional_float(parameters, "los_source_beta"),
                     los_source_outer_slope=resolve_optional_float(parameters, "los_source_outer_slope"),
+                    los_harmonic_m1=float(parameters.get("los_harmonic_m1", 0.0)),
+                    los_harmonic_m2=float(parameters.get("los_harmonic_m2", 0.0)),
+                    los_harmonic_m3=float(parameters.get("los_harmonic_m3", 0.0)),
+                    los_harmonic_phase_deg=float(parameters.get("los_harmonic_phase_deg", 0.0)),
                     los_axis_ratio=float(parameters.get("los_axis_ratio", 1.0)),
                     los_angle_offset_deg=float(parameters.get("los_angle_offset_deg", 0.0)),
                     los_shift_parallel_arcsec=float(parameters["los_shift_parallel_arcsec"]),
@@ -955,6 +1005,10 @@ def final_evaluation(
                 best_parameters,
                 "smooth_background_source_outer_slope",
             ),
+            smooth_background_harmonic_m1=float(best_parameters.get("smooth_background_harmonic_m1", 0.0)),
+            smooth_background_harmonic_m2=float(best_parameters.get("smooth_background_harmonic_m2", 0.0)),
+            smooth_background_harmonic_m3=float(best_parameters.get("smooth_background_harmonic_m3", 0.0)),
+            smooth_background_harmonic_phase_deg=float(best_parameters.get("smooth_background_harmonic_phase_deg", 0.0)),
             smooth_background_axis_ratio=float(best_parameters.get("smooth_background_axis_ratio", 1.0)),
             smooth_background_angle_offset_deg=float(best_parameters.get("smooth_background_angle_offset_deg", 0.0)),
             smooth_background_shift_parallel_arcsec=float(best_parameters["smooth_background_shift_parallel_arcsec"]),
@@ -978,6 +1032,10 @@ def final_evaluation(
             los_source_kind=resolve_optional_source_kind(best_parameters.get("los_source_kind", None)),
             los_source_beta=resolve_optional_float(best_parameters, "los_source_beta"),
             los_source_outer_slope=resolve_optional_float(best_parameters, "los_source_outer_slope"),
+            los_harmonic_m1=float(best_parameters.get("los_harmonic_m1", 0.0)),
+            los_harmonic_m2=float(best_parameters.get("los_harmonic_m2", 0.0)),
+            los_harmonic_m3=float(best_parameters.get("los_harmonic_m3", 0.0)),
+            los_harmonic_phase_deg=float(best_parameters.get("los_harmonic_phase_deg", 0.0)),
             los_axis_ratio=float(best_parameters.get("los_axis_ratio", 1.0)),
             los_angle_offset_deg=float(best_parameters.get("los_angle_offset_deg", 0.0)),
             los_shift_parallel_arcsec=float(best_parameters["los_shift_parallel_arcsec"]),
@@ -1058,8 +1116,14 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
     smooth_background_source_outer_slope_values = (
         [None] if not args.smooth_background_source_outer_slope_values else args.smooth_background_source_outer_slope_values
     )
+    smooth_background_harmonic_m1_values = args.smooth_background_harmonic_m1_values
+    smooth_background_harmonic_m2_values = args.smooth_background_harmonic_m2_values
+    smooth_background_harmonic_m3_values = args.smooth_background_harmonic_m3_values
     los_source_beta_values = [None] if not args.los_source_beta_values else args.los_source_beta_values
     los_source_outer_slope_values = [None] if not args.los_source_outer_slope_values else args.los_source_outer_slope_values
+    los_harmonic_m1_values = args.los_harmonic_m1_values
+    los_harmonic_m2_values = args.los_harmonic_m2_values
+    los_harmonic_m3_values = args.los_harmonic_m3_values
     smooth_background_position_shrink_parallel_values = (
         args.smooth_background_position_shrink_parallel_values
         if args.smooth_background_position_shrink_parallel_values
@@ -1177,6 +1241,10 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "smooth_background_source_kind": args.smooth_background_source_kind_values,
             "smooth_background_source_beta": smooth_background_source_beta_values,
             "smooth_background_source_outer_slope": smooth_background_source_outer_slope_values,
+            "smooth_background_harmonic_m1": smooth_background_harmonic_m1_values,
+            "smooth_background_harmonic_m2": smooth_background_harmonic_m2_values,
+            "smooth_background_harmonic_m3": smooth_background_harmonic_m3_values,
+            "smooth_background_harmonic_phase_deg": args.smooth_background_harmonic_phase_deg_values,
             "smooth_background_axis_ratio": args.smooth_background_axis_ratio_values,
             "smooth_background_angle_offset_deg": args.smooth_background_angle_offset_deg_values,
             "los_size_multiplier": [args.los_size_multiplier_values[0]],
@@ -1202,6 +1270,10 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "los_source_kind": args.los_source_kind_values,
             "los_source_beta": los_source_beta_values,
             "los_source_outer_slope": los_source_outer_slope_values,
+            "los_harmonic_m1": los_harmonic_m1_values,
+            "los_harmonic_m2": los_harmonic_m2_values,
+            "los_harmonic_m3": los_harmonic_m3_values,
+            "los_harmonic_phase_deg": args.los_harmonic_phase_deg_values,
             "los_axis_ratio": args.los_axis_ratio_values,
             "los_angle_offset_deg": args.los_angle_offset_deg_values,
             "los_shift_parallel_arcsec": args.los_shift_parallel_arcsec_values,
@@ -1313,6 +1385,10 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "smooth_background_source_kind_values": args.smooth_background_source_kind_values,
             "smooth_background_source_beta_values": smooth_background_source_beta_values,
             "smooth_background_source_outer_slope_values": smooth_background_source_outer_slope_values,
+            "smooth_background_harmonic_m1_values": smooth_background_harmonic_m1_values,
+            "smooth_background_harmonic_m2_values": smooth_background_harmonic_m2_values,
+            "smooth_background_harmonic_m3_values": smooth_background_harmonic_m3_values,
+            "smooth_background_harmonic_phase_deg_values": args.smooth_background_harmonic_phase_deg_values,
             "smooth_background_axis_ratio_values": args.smooth_background_axis_ratio_values,
             "smooth_background_angle_offset_deg_values": args.smooth_background_angle_offset_deg_values,
             "member_rotation_deg_values": args.member_rotation_deg_values,
@@ -1323,6 +1399,10 @@ def command_calibrate_hff_ensemble(args: argparse.Namespace) -> None:
             "los_source_kind_values": args.los_source_kind_values,
             "los_source_beta_values": los_source_beta_values,
             "los_source_outer_slope_values": los_source_outer_slope_values,
+            "los_harmonic_m1_values": los_harmonic_m1_values,
+            "los_harmonic_m2_values": los_harmonic_m2_values,
+            "los_harmonic_m3_values": los_harmonic_m3_values,
+            "los_harmonic_phase_deg_values": args.los_harmonic_phase_deg_values,
             "los_axis_ratio_values": args.los_axis_ratio_values,
             "los_angle_offset_deg_values": args.los_angle_offset_deg_values,
             "residual_mode": args.residual_mode,
@@ -1415,6 +1495,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     calibrate.add_argument("--smooth-background-source-beta-values", nargs="*", type=float, default=[])
     calibrate.add_argument("--smooth-background-source-outer-slope-values", nargs="*", type=float, default=[])
+    calibrate.add_argument("--smooth-background-harmonic-m1-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--smooth-background-harmonic-m2-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--smooth-background-harmonic-m3-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--smooth-background-harmonic-phase-deg-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--smooth-background-axis-ratio-values", nargs="+", type=float, default=[1.0])
     calibrate.add_argument("--smooth-background-angle-offset-deg-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--smooth-background-shift-parallel-arcsec-values", nargs="+", type=float, default=[0.0])
@@ -1438,6 +1522,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     calibrate.add_argument("--los-source-beta-values", nargs="*", type=float, default=[])
     calibrate.add_argument("--los-source-outer-slope-values", nargs="*", type=float, default=[])
+    calibrate.add_argument("--los-harmonic-m1-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--los-harmonic-m2-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--los-harmonic-m3-values", nargs="+", type=float, default=[0.0])
+    calibrate.add_argument("--los-harmonic-phase-deg-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--los-axis-ratio-values", nargs="+", type=float, default=[1.0])
     calibrate.add_argument("--los-angle-offset-deg-values", nargs="+", type=float, default=[0.0])
     calibrate.add_argument("--los-minimum-size-scale", type=float, default=2.0)

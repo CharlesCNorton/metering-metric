@@ -165,6 +165,40 @@ class DomainSpeciesPrediction:
     observables: MassiveModeObservables
 
 
+@dataclass(frozen=True)
+class MessengerWindowCase:
+    case_name: str
+    domain_name: str
+    screening_length_m: float
+    activity_density: float
+    path_length_m: float
+    alpha: float
+    closure_ratio: float
+    species: PhysicalSpeciesKinematics
+    max_delay_s: float
+    epsilon: float = 0.0
+    expansion_rate_s_inv: float = 0.0
+    tau_planck_multiples: float = 1.0
+
+
+@dataclass(frozen=True)
+class MessengerWindowPrediction:
+    case_name: str
+    domain_name: str
+    bridge_conversion: float
+    closure_ratio: float
+    uniform_lapse: float
+    current_delay_s: float
+    turning_activity_density: float
+    minimum_activity_density_for_delay_cap: float
+    delay_cap_required_lapse: float
+    naive_screening_cell_occupancy_fraction: float
+    required_collective_enhancement: float
+    exclusion_avoided: bool
+    delay_cap_satisfied: bool
+    observables: MassiveModeObservables
+
+
 def tanh_lapse(mu: float | np.ndarray, alpha: float, epsilon: float = 0.0) -> float | np.ndarray:
     if epsilon < 0.0 or epsilon >= 1.0:
         raise ValueError("epsilon must lie in [0, 1).")
@@ -209,6 +243,44 @@ def steady_state_occupancy_density(
         expansion_rate_s_inv=expansion_rate_s_inv,
     )
     return float(activity_density * tau_p_s * relaxation_factor)
+
+
+def screening_cell_occupancy_fraction(
+    activity_density: float,
+    screening_length_m: float,
+    tau_p_s: float,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    if activity_density <= 0.0:
+        raise ValueError("activity_density must be positive.")
+    if screening_length_m <= 0.0:
+        raise ValueError("screening_length_m must be positive.")
+    occupancy_density = steady_state_occupancy_density(
+        activity_density=activity_density,
+        tau_p_s=tau_p_s,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    return float(occupancy_density * (screening_length_m ** 3))
+
+
+def required_collective_enhancement_for_closure_ratio(
+    closure_ratio: float,
+    activity_density: float,
+    screening_length_m: float,
+    tau_p_s: float,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    if closure_ratio <= 0.0:
+        raise ValueError("closure_ratio must be positive.")
+    naive_fraction = screening_cell_occupancy_fraction(
+        activity_density=activity_density,
+        screening_length_m=screening_length_m,
+        tau_p_s=tau_p_s,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    if naive_fraction <= 0.0:
+        return math.inf
+    return float(closure_ratio / naive_fraction)
 
 
 def relaxed_bridge_conversion(
@@ -684,6 +756,65 @@ def required_activity_density_for_turning(
     )
 
 
+def required_uniform_lapse_for_delay_cap(
+    path_length_m: float,
+    max_delay_s: float,
+    conserved_energy: float,
+    rest_mass: float = 1.0,
+) -> float:
+    if path_length_m <= 0.0:
+        raise ValueError("path_length_m must be positive.")
+    if max_delay_s < 0.0:
+        raise ValueError("max_delay_s must be nonnegative.")
+    if conserved_energy <= 0.0:
+        raise ValueError("conserved_energy must be positive.")
+    if rest_mass < 0.0:
+        raise ValueError("rest_mass must be nonnegative.")
+    if rest_mass == 0.0:
+        return 0.0
+    if max_delay_s == 0.0:
+        return math.inf
+    delay_ratio = (max_delay_s * C) / path_length_m
+    v_required = 1.0 / (1.0 + delay_ratio)
+    if v_required <= 0.0:
+        return 0.0
+    if v_required >= 1.0:
+        return math.inf
+    denominator = math.sqrt(max(1.0 - (v_required * v_required), 0.0))
+    if denominator <= 0.0:
+        return math.inf
+    return float((rest_mass / conserved_energy) / denominator)
+
+
+def minimum_activity_density_for_delay_cap(
+    path_length_m: float,
+    max_delay_s: float,
+    conserved_energy: float,
+    rest_mass: float,
+    alpha: float,
+    screening_mass: float,
+    bridge_conversion: float,
+    epsilon: float = 0.0,
+) -> float:
+    target_lapse = required_uniform_lapse_for_delay_cap(
+        path_length_m=path_length_m,
+        max_delay_s=max_delay_s,
+        conserved_energy=conserved_energy,
+        rest_mass=rest_mass,
+    )
+    if not math.isfinite(target_lapse):
+        return math.inf
+    if target_lapse <= epsilon:
+        return 0.0
+    return required_activity_density_for_lapse(
+        target_lapse=target_lapse,
+        alpha=alpha,
+        screening_mass=screening_mass,
+        bridge_conversion=bridge_conversion,
+        epsilon=epsilon,
+    )
+
+
 def uniform_lapse_from_activity(
     activity_density: float,
     alpha: float,
@@ -1064,6 +1195,97 @@ def theory_native_domain_species_predictions(
     return {
         str(name): theory_native_domain_species_prediction(domain=domain, species=species)
         for name, species in species_rows.items()
+    }
+
+
+def messenger_window_prediction(case: MessengerWindowCase) -> MessengerWindowPrediction:
+    if case.activity_density <= 0.0:
+        raise ValueError("activity_density must be positive.")
+    if case.screening_length_m <= 0.0:
+        raise ValueError("screening_length_m must be positive.")
+    if case.path_length_m <= 0.0:
+        raise ValueError("path_length_m must be positive.")
+    bridge_conversion = bridge_conversion_from_theory_native_closure_ratio(
+        closure_ratio=case.closure_ratio,
+        screening_length_m=case.screening_length_m,
+        expansion_rate_s_inv=case.expansion_rate_s_inv,
+        tau_planck_multiples=case.tau_planck_multiples,
+    )
+    screening_mass = 1.0 / case.screening_length_m
+    uniform_lapse = uniform_lapse_from_activity(
+        activity_density=case.activity_density,
+        alpha=case.alpha,
+        screening_mass=screening_mass,
+        bridge_conversion=bridge_conversion,
+        epsilon=case.epsilon,
+    )
+    observables = same_lapse_uniform_observables(
+        path_length_m=case.path_length_m,
+        lapse=uniform_lapse,
+        conserved_energy=case.species.conserved_energy_eV,
+        rest_mass=case.species.rest_mass_eV,
+    )
+    turning_activity_density = required_activity_density_for_turning(
+        conserved_energy=case.species.conserved_energy_eV,
+        rest_mass=case.species.rest_mass_eV,
+        alpha=case.alpha,
+        screening_mass=screening_mass,
+        bridge_conversion=bridge_conversion,
+        epsilon=case.epsilon,
+    )
+    minimum_activity_density = minimum_activity_density_for_delay_cap(
+        path_length_m=case.path_length_m,
+        max_delay_s=case.max_delay_s,
+        conserved_energy=case.species.conserved_energy_eV,
+        rest_mass=case.species.rest_mass_eV,
+        alpha=case.alpha,
+        screening_mass=screening_mass,
+        bridge_conversion=bridge_conversion,
+        epsilon=case.epsilon,
+    )
+    required_lapse = required_uniform_lapse_for_delay_cap(
+        path_length_m=case.path_length_m,
+        max_delay_s=case.max_delay_s,
+        conserved_energy=case.species.conserved_energy_eV,
+        rest_mass=case.species.rest_mass_eV,
+    )
+    naive_fraction = screening_cell_occupancy_fraction(
+        activity_density=case.activity_density,
+        screening_length_m=case.screening_length_m,
+        tau_p_s=case.tau_planck_multiples * PLANCK_TIME,
+        expansion_rate_s_inv=case.expansion_rate_s_inv,
+    )
+    enhancement = required_collective_enhancement_for_closure_ratio(
+        closure_ratio=case.closure_ratio,
+        activity_density=case.activity_density,
+        screening_length_m=case.screening_length_m,
+        tau_p_s=case.tau_planck_multiples * PLANCK_TIME,
+        expansion_rate_s_inv=case.expansion_rate_s_inv,
+    )
+    return MessengerWindowPrediction(
+        case_name=case.case_name,
+        domain_name=case.domain_name,
+        bridge_conversion=float(bridge_conversion),
+        closure_ratio=float(case.closure_ratio),
+        uniform_lapse=float(uniform_lapse),
+        current_delay_s=float(observables.delay_s),
+        turning_activity_density=float(turning_activity_density),
+        minimum_activity_density_for_delay_cap=float(minimum_activity_density),
+        delay_cap_required_lapse=float(required_lapse),
+        naive_screening_cell_occupancy_fraction=float(naive_fraction),
+        required_collective_enhancement=float(enhancement),
+        exclusion_avoided=math.isfinite(observables.crossing_time_s),
+        delay_cap_satisfied=math.isfinite(observables.delay_s) and observables.delay_s <= case.max_delay_s,
+        observables=observables,
+    )
+
+
+def messenger_window_predictions(
+    cases: dict[str, MessengerWindowCase],
+) -> dict[str, MessengerWindowPrediction]:
+    return {
+        str(name): messenger_window_prediction(case)
+        for name, case in cases.items()
     }
 
 
