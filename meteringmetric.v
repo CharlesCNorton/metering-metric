@@ -349,6 +349,25 @@ Proof.
     lra.
 Qed.
 
+Theorem proper_time_density_path_le_lapse_admissible :
+  forall (f : R -> R) (mu gamma v : R -> R) (t : R),
+  0 <= v t <= lapse f mu (gamma t) ->
+  proper_time_density_path f mu gamma v t <= lapse f mu (gamma t).
+Proof.
+  intros f mu gamma v t Hadm.
+  assert (Hnonneg : 0 <= proper_time_density_path f mu gamma v t).
+  { apply proper_time_density_path_nonneg_admissible; exact Hadm. }
+  assert (Hsq : (proper_time_density_path f mu gamma v t) ^ 2 <= (lapse f mu (gamma t)) ^ 2).
+  { apply proper_time_density_path_sq_le_lapse_sq_admissible; exact Hadm. }
+  assert (Hlap_nonneg : 0 <= lapse f mu (gamma t)).
+  { destruct Hadm as [Hvnonneg Hvle]. lra. }
+  replace ((proper_time_density_path f mu gamma v t) ^ 2) with
+    (proper_time_density_path f mu gamma v t * proper_time_density_path f mu gamma v t) in Hsq by ring.
+  replace ((lapse f mu (gamma t)) ^ 2) with
+    (lapse f mu (gamma t) * lapse f mu (gamma t)) in Hsq by ring.
+  nra.
+Qed.
+
 (**
   Scope note: the proper-time theorem family here treats static observers and
   admissible prescribed paths supported entirely in meterless regions. It
@@ -615,6 +634,153 @@ Proof.
   - field_simplify.
     + exact Hsq.
     + nra.
+Qed.
+
+Theorem V_eff_lapse_ge_one :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x, 1 <= V_eff (lapse f mu) x.
+Proof.
+  intros f mu Hf Hmu x.
+  assert (Hlap_pos : 0 < lapse f mu x) by (apply lapse_pos; assumption).
+  assert (Hlap_le_one : lapse f mu x <= 1) by (apply lapse_le_one; assumption).
+  unfold V_eff.
+  apply (Rmult_le_reg_r (lapse f mu x * lapse f mu x)).
+  - nra.
+  - field_simplify.
+    + nra.
+    + nra.
+Qed.
+
+Theorem V_eff_massive_ge_mass_sq :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m, 0 <= m -> m ^ 2 <= V_eff_massive (lapse f mu) m x.
+Proof.
+  intros f mu Hf Hmu x m Hm.
+  unfold V_eff_massive.
+  assert (HV : 1 <= V_eff (lapse f mu) x).
+  { apply V_eff_lapse_ge_one; assumption. }
+  nra.
+Qed.
+
+Theorem turning_threshold_monotone_massive :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m1 m2 E, m1 > 0 -> m1 <= m2 -> E > 0 ->
+  lapse f mu x < m1 / E ->
+  lapse f mu x < m2 / E.
+Proof.
+  intros f mu Hf Hmu x m1 m2 E Hm1 Hm12 HE Hturn.
+  assert (HinvE : 0 < / E) by (apply Rinv_0_lt_compat; exact HE).
+  assert (Hdiv : m1 / E <= m2 / E).
+  {
+    unfold Rdiv.
+    apply Rmult_le_compat_r.
+    - left. exact HinvE.
+    - exact Hm12.
+  }
+  lra.
+Qed.
+
+Theorem forbidden_region_monotone_massive :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m1 m2 E, m1 > 0 -> m1 <= m2 -> E > 0 ->
+  lapse f mu x < m1 / E ->
+  E * E < V_eff_massive (lapse f mu) m2 x.
+Proof.
+  intros f mu Hf Hmu x m1 m2 E Hm1 Hm12 HE Hturn.
+  assert (Hturn2 : lapse f mu x < m2 / E).
+  {
+    apply (turning_threshold_monotone_massive f mu Hf Hmu x m1 m2 E); assumption.
+  }
+  apply (turning_threshold_forbidden_massive f mu Hf Hmu x m2 E).
+  - lra.
+  - exact HE.
+  - exact Hturn2.
+Qed.
+
+Theorem allowed_region_nonstrict_massive :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m E, 0 <= m -> E > 0 ->
+  m / E <= lapse f mu x ->
+  V_eff_massive (lapse f mu) m x <= E * E.
+Proof.
+  intros f mu Hf Hmu x m E Hm HE Hallow.
+  assert (Hlap : 0 < lapse f mu x) by (apply lapse_pos; assumption).
+  unfold V_eff_massive, V_eff.
+  assert (Hlin : m <= E * lapse f mu x).
+  {
+    replace m with (E * (m / E)).
+    2:{ field; lra. }
+    nra.
+  }
+  assert (Hrhs_nonneg : 0 <= E * lapse f mu x) by nra.
+  assert (Hsq : m ^ 2 <= E ^ 2 * lapse f mu x ^ 2).
+  {
+    replace (m ^ 2) with (m * m) by ring.
+    replace (E ^ 2 * lapse f mu x ^ 2) with ((E * lapse f mu x) * (E * lapse f mu x)) by ring.
+    nra.
+  }
+  apply (Rmult_le_reg_r (lapse f mu x ^ 2)).
+  - nra.
+  - field_simplify.
+    + replace (E ^ 2 * lapse f mu x ^ 2) with (lapse f mu x ^ 2 * E ^ 2) in Hsq by ring.
+      exact Hsq.
+    + nra.
+Qed.
+
+Theorem turning_threshold_antitone_energy :
+  forall m E1 E2, 0 <= m -> 0 < E1 -> E1 <= E2 ->
+  m / E2 <= m / E1.
+Proof.
+  intros m E1 E2 Hm HE1 HE12.
+  unfold Rdiv.
+  apply Rmult_le_compat_l.
+  - exact Hm.
+  - apply Rinv_le_contravar; nra.
+Qed.
+
+Theorem forbidden_region_antitone_energy :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m E1 E2, 0 <= m -> 0 < E1 -> E1 <= E2 ->
+  lapse f mu x < m / E2 ->
+  lapse f mu x < m / E1.
+Proof.
+  intros f mu Hf Hmu x m E1 E2 Hm HE1 HE12 Hturn.
+  assert (Hthr : m / E2 <= m / E1).
+  { apply turning_threshold_antitone_energy; assumption. }
+  lra.
+Qed.
+
+Theorem allowed_region_monotone_energy :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall x m E1 E2, 0 <= m -> 0 < E1 -> E1 <= E2 ->
+  m / E1 <= lapse f mu x ->
+  m / E2 <= lapse f mu x.
+Proof.
+  intros f mu Hf Hmu x m E1 E2 Hm HE1 HE12 Hallow.
+  assert (Hthr : m / E2 <= m / E1).
+  { apply turning_threshold_antitone_energy; assumption. }
+  lra.
+Qed.
+
+Theorem floor_exclusion_impossible_massive :
+  forall f mu,
+  ActivationProps f -> MeteringProps mu ->
+  forall m E eps, 0 <= m -> E > 0 -> 0 <= eps ->
+  (forall x, eps <= lapse f mu x) ->
+  m / E <= eps ->
+  forall x, V_eff_massive (lapse f mu) m x <= E * E.
+Proof.
+  intros f mu Hf Hmu m E eps Hm HE Heps Hfloor Hratio x.
+  apply (allowed_region_nonstrict_massive f mu Hf Hmu x m E); [exact Hm | exact HE |].
+  specialize (Hfloor x).
+  lra.
 Qed.
 
 Theorem wkb_integral_diverges :

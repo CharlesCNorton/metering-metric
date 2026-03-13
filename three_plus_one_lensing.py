@@ -918,6 +918,22 @@ def interpolate_radial_field(impacts: np.ndarray, values: np.ndarray, radius: np
     )
 
 
+def component_projected_radius_and_phi(dx: np.ndarray, dy: np.ndarray, spec: dict) -> tuple[np.ndarray, np.ndarray]:
+    axis_ratio = float(spec.get("axis_ratio", 1.0))
+    if axis_ratio <= 0.0:
+        raise ValueError("axis_ratio must be positive.")
+    axis_ratio = min(axis_ratio, 1.0)
+    orientation_deg = float(spec.get("orientation_deg", 0.0))
+    angle = math.radians(orientation_deg)
+    cos_angle = math.cos(angle)
+    sin_angle = math.sin(angle)
+    x_major = cos_angle * dx + sin_angle * dy
+    y_minor = -sin_angle * dx + cos_angle * dy
+    radius = np.sqrt(x_major * x_major + (y_minor * y_minor) / max(axis_ratio * axis_ratio, 1.0e-12))
+    phi = np.arctan2(y_minor / max(axis_ratio, 1.0e-12), x_major)
+    return radius, phi
+
+
 def component_weight(spec: dict) -> float:
     return float(spec.get("weight", spec.get("amplitude_scale", 1.0)))
 
@@ -944,6 +960,22 @@ def component_principal_axis_deg(specs: list[dict]) -> float:
     major_axis = eigenvectors[:, int(np.argmax(eigenvalues))]
     angle = math.degrees(math.atan2(float(major_axis[1]), float(major_axis[0])))
     return float(angle)
+
+
+def component_principal_axis_ratio(specs: list[dict]) -> float:
+    center_x, center_y = component_centroid(specs)
+    total_weight = max(sum(component_weight(spec) for spec in specs), 1.0e-12)
+    covariance = np.zeros((2, 2), dtype=float)
+    for spec in specs:
+        dx = float(spec["center_x"]) - center_x
+        dy = float(spec["center_y"]) - center_y
+        weight = component_weight(spec)
+        displacement = np.array([[dx], [dy]], dtype=float)
+        covariance += weight * (displacement @ displacement.T)
+    covariance /= total_weight
+    eigenvalues, _ = np.linalg.eigh(covariance)
+    eigenvalues = np.sort(np.maximum(eigenvalues, 1.0e-18))
+    return float(math.sqrt(eigenvalues[0] / eigenvalues[1]))
 
 
 def residual_angular_harmonics(
@@ -1202,14 +1234,17 @@ def build_einstein_component_payloads(
 ) -> list[dict]:
     component_payloads = []
     for spec in component_specs:
+        resolved_source_kind = str(spec.get("source_kind", source_kind))
+        resolved_source_beta = float(spec.get("source_beta", source_beta))
+        resolved_source_outer_slope = float(spec.get("source_outer_slope", source_outer_slope))
         profile = solve_screened_poisson_cluster_profile(
-            source_kind=source_kind,
+            source_kind=resolved_source_kind,
             source_amplitude=source_amplitude * float(spec.get("amplitude_scale", 1.0)),
             source_sigma=source_sigma * float(spec.get("sigma_scale", 1.0)),
             source_core_radius=source_core_radius * float(spec.get("core_scale", 1.0)),
             source_scale_radius=source_scale_radius * float(spec.get("scale_radius_scale", 1.0)),
-            source_beta=source_beta,
-            source_outer_slope=source_outer_slope,
+            source_beta=resolved_source_beta,
+            source_outer_slope=resolved_source_outer_slope,
             screening_mass=screening_mass,
             profile_r_max=profile_r_max,
             profile_samples=profile_samples,
@@ -1230,7 +1265,12 @@ def build_einstein_component_payloads(
         component_payloads.append(
             {
                 "spec": spec,
-                "source_profile": profile.metadata,
+                "source_profile": {
+                    **profile.metadata,
+                    "resolved_source_kind": resolved_source_kind,
+                    "resolved_source_beta": resolved_source_beta,
+                    "resolved_source_outer_slope": resolved_source_outer_slope,
+                },
                 "metric_metadata": metric.metadata,
                 "radial_profile": radial_profile,
             }
@@ -1271,10 +1311,9 @@ def build_multicomponent_lensing_map(
         shear_tangential = np.asarray(radial_profile["shear_tangential"], dtype=float)
         dx = x_grid - float(payload["spec"]["center_x"])
         dy = y_grid - float(payload["spec"]["center_y"])
-        radius = np.sqrt(dx * dx + dy * dy)
+        radius, phi = component_projected_radius_and_phi(dx=dx, dy=dy, spec=payload["spec"])
         kappa_local = interpolate_radial_field(impacts, convergence, radius)
         gamma_t_local = interpolate_radial_field(impacts, shear_tangential, radius)
-        phi = np.arctan2(dy, dx)
         gamma1_local = -gamma_t_local * np.cos(2.0 * phi)
         gamma2_local = -gamma_t_local * np.sin(2.0 * phi)
         kappa_total += kappa_local

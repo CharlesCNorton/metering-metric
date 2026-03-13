@@ -35,6 +35,56 @@ class OccupancyBridge:
 
 
 @dataclass(frozen=True)
+class TheoryNativeBridgeClosure:
+    screening_length_m: float
+    eta_j: float
+    tau_planck_multiples: float = 1.0
+    transverse_screening_multiples: float = 1.0
+    expansion_rate_s_inv: float = 0.0
+
+    def tau_p_s(self) -> float:
+        if self.tau_planck_multiples <= 0.0:
+            raise ValueError("tau_planck_multiples must be positive.")
+        return float(self.tau_planck_multiples * PLANCK_TIME)
+
+    def l_perp_m(self) -> float:
+        if self.screening_length_m <= 0.0:
+            raise ValueError("screening_length_m must be positive.")
+        if self.transverse_screening_multiples <= 0.0:
+            raise ValueError("transverse_screening_multiples must be positive.")
+        return float(self.transverse_screening_multiples * self.screening_length_m)
+
+    def dimensionless_closure_ratio(self) -> float:
+        if self.eta_j <= 0.0:
+            raise ValueError("eta_j must be positive.")
+        if self.tau_planck_multiples <= 0.0:
+            raise ValueError("tau_planck_multiples must be positive.")
+        if self.transverse_screening_multiples <= 0.0:
+            raise ValueError("transverse_screening_multiples must be positive.")
+        return float(self.eta_j * self.tau_planck_multiples / (self.transverse_screening_multiples ** 2))
+
+    def bridge_conversion(self) -> float:
+        return relaxed_bridge_conversion(
+            eta_j=self.eta_j,
+            tau_p_s=self.tau_p_s(),
+            l_perp_m=self.l_perp_m(),
+            expansion_rate_s_inv=self.expansion_rate_s_inv,
+        )
+
+
+@dataclass(frozen=True)
+class OccupancyRelaxationState:
+    activity_density: float
+    expansion_rate_s_inv: float
+    tau_p_s: float
+    occupancy_density: float
+    eta_j: float
+    l_perp_m: float
+    bridge_conversion: float
+    static_source: float
+
+
+@dataclass(frozen=True)
 class SourceDomainState:
     activity_density: float
     bridge_conversion: float
@@ -65,6 +115,16 @@ class MassiveModeObservables:
     wkb_action: float
 
 
+@dataclass(frozen=True)
+class SpeciesProfileObservables:
+    species_name: str
+    rest_mass: float
+    conserved_energy: float
+    turning_lapse: float
+    required_activity_density: float
+    observables: MassiveModeObservables
+
+
 def tanh_lapse(mu: float | np.ndarray, alpha: float, epsilon: float = 0.0) -> float | np.ndarray:
     if epsilon < 0.0 or epsilon >= 1.0:
         raise ValueError("epsilon must lie in [0, 1).")
@@ -88,6 +148,151 @@ def occupancy_bridge_conversion(eta_j: float, tau_p_s: float, l_perp_m: float) -
     return OccupancyBridge(eta_j=eta_j, tau_p_s=tau_p_s, l_perp_m=l_perp_m).conversion_factor()
 
 
+def occupancy_relaxation_factor(tau_p_s: float, expansion_rate_s_inv: float = 0.0) -> float:
+    if tau_p_s <= 0.0:
+        raise ValueError("tau_p_s must be positive.")
+    denominator = 1.0 + (expansion_rate_s_inv * tau_p_s)
+    if denominator <= 0.0:
+        raise ValueError("1 + expansion_rate_s_inv * tau_p_s must be positive.")
+    return float(1.0 / denominator)
+
+
+def steady_state_occupancy_density(
+    activity_density: float,
+    tau_p_s: float,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    if activity_density <= 0.0:
+        raise ValueError("activity_density must be positive.")
+    relaxation_factor = occupancy_relaxation_factor(
+        tau_p_s=tau_p_s,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    return float(activity_density * tau_p_s * relaxation_factor)
+
+
+def relaxed_bridge_conversion(
+    eta_j: float,
+    tau_p_s: float,
+    l_perp_m: float,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    if eta_j <= 0.0:
+        raise ValueError("eta_j must be positive.")
+    if l_perp_m <= 0.0:
+        raise ValueError("l_perp_m must be positive.")
+    relaxation_factor = occupancy_relaxation_factor(
+        tau_p_s=tau_p_s,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    return float(eta_j * tau_p_s * relaxation_factor / (l_perp_m * l_perp_m))
+
+
+def theory_native_bridge_conversion(
+    screening_length_m: float,
+    eta_j: float,
+    tau_planck_multiples: float = 1.0,
+    transverse_screening_multiples: float = 1.0,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    closure = TheoryNativeBridgeClosure(
+        screening_length_m=screening_length_m,
+        eta_j=eta_j,
+        tau_planck_multiples=tau_planck_multiples,
+        transverse_screening_multiples=transverse_screening_multiples,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    return closure.bridge_conversion()
+
+
+def required_theory_native_closure_ratio(
+    required_conversion: float,
+    screening_length_m: float,
+    expansion_rate_s_inv: float = 0.0,
+    tau_planck_multiples: float = 1.0,
+) -> float:
+    if required_conversion <= 0.0:
+        raise ValueError("required_conversion must be positive.")
+    if screening_length_m <= 0.0:
+        raise ValueError("screening_length_m must be positive.")
+    if tau_planck_multiples <= 0.0:
+        raise ValueError("tau_planck_multiples must be positive.")
+    relaxation_factor = occupancy_relaxation_factor(
+        tau_p_s=tau_planck_multiples * PLANCK_TIME,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    return float(required_conversion * (screening_length_m * screening_length_m) / (PLANCK_TIME * relaxation_factor))
+
+
+def theory_native_transverse_multiple_for_unit_ratio(
+    required_conversion: float,
+    screening_length_m: float,
+    expansion_rate_s_inv: float = 0.0,
+    tau_planck_multiples: float = 1.0,
+) -> float:
+    ratio = required_theory_native_closure_ratio(
+        required_conversion=required_conversion,
+        screening_length_m=screening_length_m,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+        tau_planck_multiples=tau_planck_multiples,
+    )
+    return float(math.sqrt(max(1.0 / ratio, 0.0)))
+
+
+def required_eta_for_theory_native_closure(
+    required_conversion: float,
+    screening_length_m: float,
+    tau_planck_multiples: float = 1.0,
+    transverse_screening_multiples: float = 1.0,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    ratio = required_theory_native_closure_ratio(
+        required_conversion=required_conversion,
+        screening_length_m=screening_length_m,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+        tau_planck_multiples=tau_planck_multiples,
+    )
+    if tau_planck_multiples <= 0.0:
+        raise ValueError("tau_planck_multiples must be positive.")
+    if transverse_screening_multiples <= 0.0:
+        raise ValueError("transverse_screening_multiples must be positive.")
+    return float(ratio * (transverse_screening_multiples ** 2) / tau_planck_multiples)
+
+
+def occupancy_relaxation_state(
+    activity_density: float,
+    eta_j: float,
+    tau_p_s: float,
+    l_perp_m: float,
+    expansion_rate_s_inv: float = 0.0,
+) -> OccupancyRelaxationState:
+    occupancy_density = steady_state_occupancy_density(
+        activity_density=activity_density,
+        tau_p_s=tau_p_s,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    bridge_conversion = relaxed_bridge_conversion(
+        eta_j=eta_j,
+        tau_p_s=tau_p_s,
+        l_perp_m=l_perp_m,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    static_source = static_source_amplitude_from_activity(
+        activity_density=activity_density,
+        bridge_conversion=bridge_conversion,
+    )
+    return OccupancyRelaxationState(
+        activity_density=float(activity_density),
+        expansion_rate_s_inv=float(expansion_rate_s_inv),
+        tau_p_s=float(tau_p_s),
+        occupancy_density=float(occupancy_density),
+        eta_j=float(eta_j),
+        l_perp_m=float(l_perp_m),
+        bridge_conversion=float(bridge_conversion),
+        static_source=float(static_source),
+    )
+
+
 def bridge_efficiency_for_conversion(required_conversion: float, tau_p_s: float, l_perp_m: float) -> float:
     if required_conversion <= 0.0:
         raise ValueError("required_conversion must be positive.")
@@ -96,6 +301,21 @@ def bridge_efficiency_for_conversion(required_conversion: float, tau_p_s: float,
     if l_perp_m <= 0.0:
         raise ValueError("l_perp_m must be positive.")
     return float(required_conversion * (l_perp_m * l_perp_m) / tau_p_s)
+
+
+def relaxed_bridge_efficiency_for_conversion(
+    required_conversion: float,
+    tau_p_s: float,
+    l_perp_m: float,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    if required_conversion <= 0.0:
+        raise ValueError("required_conversion must be positive.")
+    relaxation_factor = occupancy_relaxation_factor(
+        tau_p_s=tau_p_s,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    return float(required_conversion * (l_perp_m * l_perp_m) / (tau_p_s * relaxation_factor))
 
 
 def bridge_transverse_scale_for_conversion(required_conversion: float, eta_j: float, tau_p_s: float) -> float:
@@ -108,6 +328,23 @@ def bridge_transverse_scale_for_conversion(required_conversion: float, eta_j: fl
     return float(math.sqrt(eta_j * tau_p_s / required_conversion))
 
 
+def relaxed_bridge_transverse_scale_for_conversion(
+    required_conversion: float,
+    eta_j: float,
+    tau_p_s: float,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    if required_conversion <= 0.0:
+        raise ValueError("required_conversion must be positive.")
+    if eta_j <= 0.0:
+        raise ValueError("eta_j must be positive.")
+    relaxation_factor = occupancy_relaxation_factor(
+        tau_p_s=tau_p_s,
+        expansion_rate_s_inv=expansion_rate_s_inv,
+    )
+    return float(math.sqrt(eta_j * tau_p_s * relaxation_factor / required_conversion))
+
+
 def bridge_persistence_for_conversion(required_conversion: float, eta_j: float, l_perp_m: float) -> float:
     if required_conversion <= 0.0:
         raise ValueError("required_conversion must be positive.")
@@ -116,6 +353,34 @@ def bridge_persistence_for_conversion(required_conversion: float, eta_j: float, 
     if l_perp_m <= 0.0:
         raise ValueError("l_perp_m must be positive.")
     return float(required_conversion * (l_perp_m * l_perp_m) / eta_j)
+
+
+def relaxed_bridge_persistence_for_conversion(
+    required_conversion: float,
+    eta_j: float,
+    l_perp_m: float,
+    expansion_rate_s_inv: float = 0.0,
+) -> float:
+    if required_conversion <= 0.0:
+        raise ValueError("required_conversion must be positive.")
+    if eta_j <= 0.0:
+        raise ValueError("eta_j must be positive.")
+    if l_perp_m <= 0.0:
+        raise ValueError("l_perp_m must be positive.")
+    if expansion_rate_s_inv == 0.0:
+        return bridge_persistence_for_conversion(
+            required_conversion=required_conversion,
+            eta_j=eta_j,
+            l_perp_m=l_perp_m,
+        )
+    a = required_conversion / eta_j
+    b = required_conversion * expansion_rate_s_inv * (l_perp_m * l_perp_m) / eta_j
+    if abs(b) <= 1.0e-30:
+        return float(a * l_perp_m * l_perp_m)
+    tau_p_s = a * l_perp_m * l_perp_m / max(1.0 - b, 1.0e-30)
+    if tau_p_s <= 0.0:
+        raise ValueError("No positive persistence time satisfies the relaxed bridge parameters.")
+    return float(tau_p_s)
 
 
 def effective_backreaction_scale(source_amplitude: float, density_scale: float, gravity_scale: float) -> float:
@@ -173,6 +438,14 @@ def static_source_amplitude_from_activity(activity_density: float, bridge_conver
     return float(bridge_conversion * activity_density)
 
 
+def required_activity_density_for_source_amplitude(source_amplitude: float, bridge_conversion: float) -> float:
+    if source_amplitude <= 0.0:
+        raise ValueError("source_amplitude must be positive.")
+    if bridge_conversion <= 0.0:
+        raise ValueError("bridge_conversion must be positive.")
+    return float(source_amplitude / bridge_conversion)
+
+
 def backreaction_scale_from_activity(
     activity_density: float,
     bridge_conversion: float,
@@ -188,6 +461,17 @@ def backreaction_scale_from_activity(
         density_scale=density_scale,
         gravity_scale=gravity_scale,
     )
+
+
+def required_gravity_density_product(
+    effective_scale: float,
+    source_amplitude: float,
+) -> float:
+    if effective_scale <= 0.0:
+        raise ValueError("effective_scale must be positive.")
+    if source_amplitude <= 0.0:
+        raise ValueError("source_amplitude must be positive.")
+    return float(effective_scale / (source_amplitude * source_amplitude))
 
 
 def required_bridge_conversion_from_backreaction_scale(
@@ -255,6 +539,94 @@ def uniform_screened_mu_from_source(static_source: float | np.ndarray, screening
     if screening_mass <= 0.0:
         raise ValueError("screening_mass must be positive.")
     return np.asarray(static_source) / (screening_mass * screening_mass)
+
+
+def required_uniform_mu_for_lapse(target_lapse: float, alpha: float, epsilon: float = 0.0) -> float:
+    if alpha <= 0.0:
+        raise ValueError("alpha must be positive.")
+    if epsilon < 0.0 or epsilon >= 1.0:
+        raise ValueError("epsilon must lie in [0, 1).")
+    if target_lapse <= epsilon:
+        return math.inf
+    if target_lapse >= 1.0:
+        return math.inf
+    reduced = (target_lapse - epsilon) / (1.0 - epsilon)
+    if reduced <= 0.0 or reduced >= 1.0:
+        return math.inf
+    return float(np.arctanh(reduced) / alpha)
+
+
+def required_uniform_source_for_lapse(
+    target_lapse: float,
+    alpha: float,
+    screening_mass: float,
+    epsilon: float = 0.0,
+) -> float:
+    mu_value = required_uniform_mu_for_lapse(
+        target_lapse=target_lapse,
+        alpha=alpha,
+        epsilon=epsilon,
+    )
+    return float((screening_mass * screening_mass) * mu_value)
+
+
+def required_activity_density_for_lapse(
+    target_lapse: float,
+    alpha: float,
+    screening_mass: float,
+    bridge_conversion: float,
+    epsilon: float = 0.0,
+) -> float:
+    if bridge_conversion <= 0.0:
+        raise ValueError("bridge_conversion must be positive.")
+    source_value = required_uniform_source_for_lapse(
+        target_lapse=target_lapse,
+        alpha=alpha,
+        screening_mass=screening_mass,
+        epsilon=epsilon,
+    )
+    if not math.isfinite(source_value):
+        return math.inf
+    return float(source_value / bridge_conversion)
+
+
+def required_activity_density_for_turning(
+    conserved_energy: float,
+    rest_mass: float,
+    alpha: float,
+    screening_mass: float,
+    bridge_conversion: float,
+    epsilon: float = 0.0,
+) -> float:
+    target_lapse = same_lapse_turning_lapse(
+        conserved_energy=conserved_energy,
+        rest_mass=rest_mass,
+    )
+    return required_activity_density_for_lapse(
+        target_lapse=target_lapse,
+        alpha=alpha,
+        screening_mass=screening_mass,
+        bridge_conversion=bridge_conversion,
+        epsilon=epsilon,
+    )
+
+
+def uniform_lapse_from_activity(
+    activity_density: float,
+    alpha: float,
+    screening_mass: float,
+    bridge_conversion: float,
+    epsilon: float = 0.0,
+) -> float:
+    static_source = static_source_amplitude_from_activity(
+        activity_density=activity_density,
+        bridge_conversion=bridge_conversion,
+    )
+    mu_value = uniform_screened_mu_from_source(
+        static_source=static_source,
+        screening_mass=screening_mass,
+    )
+    return float(tanh_lapse(mu_value, alpha=alpha, epsilon=epsilon))
 
 
 def same_lapse_effective_potential(lapse: np.ndarray, rest_mass: float = 1.0) -> np.ndarray:
@@ -463,6 +835,44 @@ def same_lapse_profile_observables(
             rest_mass=rest_mass,
         ),
     )
+
+
+def same_lapse_species_profile_observables(
+    grid_m: np.ndarray,
+    lapse: np.ndarray,
+    species_parameters: dict[str, tuple[float, float]],
+    alpha: float,
+    screening_mass: float,
+    bridge_conversion: float,
+    epsilon: float = 0.0,
+) -> dict[str, SpeciesProfileObservables]:
+    if bridge_conversion <= 0.0:
+        raise ValueError("bridge_conversion must be positive.")
+    rows: dict[str, SpeciesProfileObservables] = {}
+    for species_name, (rest_mass, conserved_energy) in species_parameters.items():
+        observables = same_lapse_profile_observables(
+            grid_m=grid_m,
+            lapse=lapse,
+            conserved_energy=conserved_energy,
+            rest_mass=rest_mass,
+        )
+        required_activity_density = required_activity_density_for_turning(
+            conserved_energy=conserved_energy,
+            rest_mass=rest_mass,
+            alpha=alpha,
+            screening_mass=screening_mass,
+            bridge_conversion=bridge_conversion,
+            epsilon=epsilon,
+        )
+        rows[str(species_name)] = SpeciesProfileObservables(
+            species_name=str(species_name),
+            rest_mass=float(rest_mass),
+            conserved_energy=float(conserved_energy),
+            turning_lapse=float(observables.turning_lapse),
+            required_activity_density=float(required_activity_density),
+            observables=observables,
+        )
+    return rows
 
 
 def dirichlet_schrodinger_matrix(grid: np.ndarray, potential: np.ndarray) -> np.ndarray:
